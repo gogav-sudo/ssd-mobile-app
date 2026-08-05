@@ -21,7 +21,12 @@ export default function EmployeeProfileScreen() {
   const loadHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const deviceId = await getDeviceIdentityId();
+      // Always scope strictly to THIS device's identity. Prefer the
+      // telegram_chat_id already loaded on the current employee record
+      // (guaranteed to be the exact row matched at login/registration);
+      // fall back to AsyncStorage only if the employee hasn't loaded yet.
+      // Never fall back to full_name — names are not unique across devices.
+      const deviceId = employee?.telegram_chat_id ?? (await getDeviceIdentityId());
       if (!deviceId) {
         setShifts([]);
         setMonthCount(0);
@@ -39,7 +44,7 @@ export default function EmployeeProfileScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [employee]);
 
   useFocusEffect(
     useCallback(() => {

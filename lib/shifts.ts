@@ -18,6 +18,10 @@ export async function getTodayOpenShift(deviceId: string): Promise<Shift | null>
 // Returns the count of shifts this device has logged within the current
 // calendar month (by shift_date).
 export async function getShiftCountThisMonth(deviceId: string): Promise<number> {
+  if (!deviceId) {
+    throw new Error('getShiftCountThisMonth requires a device identity id.');
+  }
+
   const { start, end } = currentMonthRange();
   const { count, error } = await supabase
     .from('shifts')
@@ -31,7 +35,13 @@ export async function getShiftCountThisMonth(deviceId: string): Promise<number> 
 }
 
 // Returns the most recent shifts for this device, newest first.
+// Strictly scoped by telegram_chat_id (the device's own identity UUID) —
+// never by full_name, since names are not guaranteed unique across devices.
 export async function getRecentShifts(deviceId: string, limit = 5): Promise<Shift[]> {
+  if (!deviceId) {
+    throw new Error('getRecentShifts requires a device identity id.');
+  }
+
   const { data, error } = await supabase
     .from('shifts')
     .select('*')

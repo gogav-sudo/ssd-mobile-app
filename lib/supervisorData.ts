@@ -7,12 +7,15 @@ export type DashboardStats = {
   openShiftsToday: number;
   newIncidents: number;
   highUrgencyToday: number;
+  residentQuestionsToday: number;
 };
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const today = todayIsoDate();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
 
-  const [openShifts, newIncidents, highUrgency] = await Promise.all([
+  const [openShifts, newIncidents, highUrgency, residentQuestions] = await Promise.all([
     supabase
       .from('shifts')
       .select('id', { count: 'exact', head: true })
@@ -27,16 +30,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .select('id', { count: 'exact', head: true })
       .eq('urgency', 'Высокая')
       .eq('shift_date', today),
+    supabase
+      .from('resident_questions')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', startOfDay.toISOString()),
   ]);
 
   if (openShifts.error) throw openShifts.error;
   if (newIncidents.error) throw newIncidents.error;
   if (highUrgency.error) throw highUrgency.error;
+  if (residentQuestions.error) throw residentQuestions.error;
 
   return {
     openShiftsToday: openShifts.count ?? 0,
     newIncidents: newIncidents.count ?? 0,
     highUrgencyToday: highUrgency.count ?? 0,
+    residentQuestionsToday: residentQuestions.count ?? 0,
   };
 }
 

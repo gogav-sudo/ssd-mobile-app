@@ -2,7 +2,14 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertOctagon, LogOut, ShieldAlert, ShieldCheck } from 'lucide-react-native';
+import {
+  AlertOctagon,
+  ChevronRight,
+  LogOut,
+  MessageCircleQuestion,
+  ShieldAlert,
+  ShieldCheck,
+} from 'lucide-react-native';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { colors, radius, spacing, type } from '@/theme';
 import { getDashboardStats, DashboardStats } from '@/lib/supervisorData';
@@ -102,6 +109,22 @@ export default function SupervisorOverviewScreen() {
           )}
 
           <Pressable
+            style={({ pressed }) => [styles.linkCard, pressed && styles.linkCardPressed]}
+            onPress={() => router.push('/supervisor/questions')}
+          >
+            <View style={[styles.statIconWrap, styles.statIconWrapGoldSmall]}>
+              <MessageCircleQuestion size={18} color={colors.gold} strokeWidth={1.6} />
+            </View>
+            <View style={styles.linkCardTextWrap}>
+              <Text style={[type.bodySmall, styles.linkCardTitle]}>Вопросы жителей</Text>
+              <Text style={[type.caption, styles.linkCardSubtitle]}>
+                {loading ? 'Загрузка…' : `${stats?.residentQuestionsToday ?? 0} за сегодня`}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
+          </Pressable>
+
+          <Pressable
             style={({ pressed }) => [styles.exitButton, pressed && styles.exitButtonPressed]}
             onPress={handleExit}
           >
@@ -174,6 +197,38 @@ const styles = StyleSheet.create({
   },
   statIconWrapError: {
     backgroundColor: colors.errorMuted,
+  },
+  statIconWrapGoldSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginBottom: 0,
+    backgroundColor: colors.goldMuted,
+  },
+  linkCard: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
+  linkCardPressed: {
+    opacity: 0.75,
+  },
+  linkCardTextWrap: {
+    flex: 1,
+  },
+  linkCardTitle: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  linkCardSubtitle: {
+    color: colors.textTertiary,
   },
   statValue: {
     color: colors.textPrimary,

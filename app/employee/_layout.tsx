@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, ClipboardList, BookOpen, User } from 'lucide-react-native';
+import { Home, ClipboardList, MessageCircleQuestion, BookOpen, User } from 'lucide-react-native';
 import { StyleSheet } from 'react-native';
 import { colors, fontFamily } from '@/theme';
 
@@ -28,6 +28,15 @@ export default function EmployeeTabsLayout() {
           title: 'Проблема',
           tabBarIcon: ({ color, size }) => (
             <ClipboardList color={color} size={size - 2} strokeWidth={1.6} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="questions"
+        options={{
+          title: 'Вопросы',
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircleQuestion color={color} size={size - 2} strokeWidth={1.6} />
           ),
         }}
       />
@@ -75,8 +84,8 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontFamily: fontFamily.body,
-    fontSize: 10.5,
-    letterSpacing: 0.6,
+    fontSize: 9.5,
+    letterSpacing: 0.4,
     marginTop: 2,
   },
 });

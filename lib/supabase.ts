@@ -63,6 +63,15 @@ export type Incident = {
   status: string;
 };
 
+export type ResidentQuestion = {
+  id: number;
+  created_at: string;
+  telegram_chat_id: string;
+  full_name: string;
+  object_name: string;
+  question_text: string;
+};
+
 export type KnowledgeBaseEntry = {
   id: number;
   created_at: string;

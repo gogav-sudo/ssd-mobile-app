@@ -58,6 +58,12 @@ export default function SupervisorTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="questions"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
