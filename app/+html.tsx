@@ -15,6 +15,25 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
         <ScrollViewStyleReset />
+        {/*
+          ScrollViewStyleReset sets `body { overflow: hidden }`, which is
+          correct for a native-style single ScrollView filling the screen
+          but blocks the page from scrolling on wide desktop viewports where
+          content can exceed the viewport height. Re-enable normal page
+          scrolling on desktop-width screens only; narrow/mobile viewports
+          keep the original app-like locked-body behavior.
+        */}
+        <style
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: `
+              @media (min-width: 768px) {
+                html, body { height: auto; min-height: 100%; overflow: auto; }
+                #root { height: auto; min-height: 100vh; }
+              }
+            `,
+          }}
+        />
         <script src="https://genvibe.pro/inspector-script.js?v=e2b" />
       </head>
       <body>{children}</body>

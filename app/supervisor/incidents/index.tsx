@@ -106,7 +106,7 @@ export default function SupervisorIncidentsListScreen() {
     URGENCY_OPTIONS.find((option) => option.value === urgency)?.label ?? 'Любая';
 
   return (
-    <ScreenBackground>
+    <ScreenBackground webMaxWidth={1100}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <Text style={[type.label, styles.headerLabel]}>ИНЦИДЕНТЫ</Text>

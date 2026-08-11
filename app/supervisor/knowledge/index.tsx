@@ -64,7 +64,7 @@ export default function SupervisorKnowledgeScreen() {
   );
 
   return (
-    <ScreenBackground>
+    <ScreenBackground webMaxWidth={1000}>
       <SafeAreaView style={styles.safe}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}

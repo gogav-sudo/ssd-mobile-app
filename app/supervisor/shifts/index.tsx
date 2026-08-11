@@ -85,7 +85,7 @@ export default function SupervisorShiftsListScreen() {
     : 'Все даты';
 
   return (
-    <ScreenBackground>
+    <ScreenBackground webMaxWidth={1100}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <Text style={[type.label, styles.headerLabel]}>СМЕНЫ</Text>

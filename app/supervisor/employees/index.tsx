@@ -34,7 +34,7 @@ export default function SupervisorEmployeesListScreen() {
   );
 
   return (
-    <ScreenBackground>
+    <ScreenBackground webMaxWidth={1000}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <Text style={[type.label, styles.headerLabel]}>СОТРУДНИКИ</Text>

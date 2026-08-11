@@ -85,7 +85,7 @@ export default function SupervisorQuestionsListScreen() {
   );
 
   return (
-    <ScreenBackground>
+    <ScreenBackground webMaxWidth={1100}>
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={12}>
