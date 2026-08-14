@@ -7,6 +7,7 @@ import {
   ChevronRight,
   LogOut,
   MessageCircleQuestion,
+  MessageSquareText,
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react-native';
@@ -119,6 +120,22 @@ export default function SupervisorOverviewScreen() {
               <Text style={[type.bodySmall, styles.linkCardTitle]}>Вопросы жителей</Text>
               <Text style={[type.caption, styles.linkCardSubtitle]}>
                 {loading ? 'Загрузка…' : `${stats?.residentQuestionsToday ?? 0} за сегодня`}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.linkCard, pressed && styles.linkCardPressed]}
+            onPress={() => router.push('/supervisor/feedback')}
+          >
+            <View style={[styles.statIconWrap, styles.statIconWrapGoldSmall]}>
+              <MessageSquareText size={18} color={colors.gold} strokeWidth={1.6} />
+            </View>
+            <View style={styles.linkCardTextWrap}>
+              <Text style={[type.bodySmall, styles.linkCardTitle]}>Ответы сотрудников</Text>
+              <Text style={[type.caption, styles.linkCardSubtitle]}>
+                {loading ? 'Загрузка…' : `${stats?.employeeFeedbackToday ?? 0} за сегодня`}
               </Text>
             </View>
             <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />

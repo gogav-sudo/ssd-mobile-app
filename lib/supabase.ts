@@ -63,6 +63,17 @@ export type Incident = {
   status: string;
 };
 
+export type EmployeeFeedback = {
+  id: number;
+  created_at: string;
+  telegram_chat_id: string;
+  full_name: string;
+  object_name: string;
+  feedback_type: 'blocker' | 'improvement';
+  feedback_text: string;
+  shift_date: string;
+};
+
 export type ResidentQuestion = {
   id: number;
   created_at: string;

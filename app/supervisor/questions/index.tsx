@@ -260,10 +260,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   rangeChipsScroll: {
+    flexGrow: 0,
     marginBottom: spacing.sm,
   },
   rangeChipsRow: {
     gap: spacing.xs,
+    alignItems: 'center',
   },
   chip: {
     borderWidth: 1,

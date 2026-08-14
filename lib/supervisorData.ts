@@ -8,6 +8,7 @@ export type DashboardStats = {
   newIncidents: number;
   highUrgencyToday: number;
   residentQuestionsToday: number;
+  employeeFeedbackToday: number;
 };
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -15,37 +16,44 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const [openShifts, newIncidents, highUrgency, residentQuestions] = await Promise.all([
-    supabase
-      .from('shifts')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'open')
-      .eq('shift_date', today),
-    supabase
-      .from('incidents')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'new'),
-    supabase
-      .from('incidents')
-      .select('id', { count: 'exact', head: true })
-      .eq('urgency', 'Высокая')
-      .eq('shift_date', today),
-    supabase
-      .from('resident_questions')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', startOfDay.toISOString()),
-  ]);
+  const [openShifts, newIncidents, highUrgency, residentQuestions, employeeFeedback] =
+    await Promise.all([
+      supabase
+        .from('shifts')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'open')
+        .eq('shift_date', today),
+      supabase
+        .from('incidents')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'new'),
+      supabase
+        .from('incidents')
+        .select('id', { count: 'exact', head: true })
+        .eq('urgency', 'Высокая')
+        .eq('shift_date', today),
+      supabase
+        .from('resident_questions')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', startOfDay.toISOString()),
+      supabase
+        .from('employee_feedback')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', startOfDay.toISOString()),
+    ]);
 
   if (openShifts.error) throw openShifts.error;
   if (newIncidents.error) throw newIncidents.error;
   if (highUrgency.error) throw highUrgency.error;
   if (residentQuestions.error) throw residentQuestions.error;
+  if (employeeFeedback.error) throw employeeFeedback.error;
 
   return {
     openShiftsToday: openShifts.count ?? 0,
     newIncidents: newIncidents.count ?? 0,
     highUrgencyToday: highUrgency.count ?? 0,
     residentQuestionsToday: residentQuestions.count ?? 0,
+    employeeFeedbackToday: employeeFeedback.count ?? 0,
   };
 }
 

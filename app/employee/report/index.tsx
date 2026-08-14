@@ -2,27 +2,28 @@ import React, { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import {
-  AlertOctagon,
-  Package,
-  ChevronRight,
-  MessageSquareWarning,
-  Users,
-  Wrench,
-  HelpCircle,
-} from 'lucide-react-native';
+import { ChevronRight, HelpCircle, Lightbulb, ShieldQuestion } from 'lucide-react-native';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { colors, radius, spacing, type } from '@/theme';
 import { useReportProblem } from '@/context/ReportProblemContext';
+import type { FeedbackType } from '@/lib/employeeFeedback';
 
-const INCIDENT_TYPES = [
-  { label: 'Поломка оборудования', icon: Wrench },
-  { label: 'Проблема на объекте', icon: AlertOctagon },
-  { label: 'Жалоба жильца', icon: MessageSquareWarning },
-  { label: 'Конфликт / ЧП', icon: Users },
-  { label: 'Не хватает материалов', icon: Package },
-  { label: 'Другое', icon: HelpCircle },
-] as const;
+const FEEDBACK_OPTIONS: {
+  label: string;
+  icon: typeof ShieldQuestion;
+  feedbackType: FeedbackType;
+}[] = [
+  {
+    label: 'Что мешало вам работать безупречно сегодня?',
+    icon: ShieldQuestion,
+    feedbackType: 'blocker',
+  },
+  {
+    label: 'Что нужно улучшить в процессе работы (даже мелочь)?',
+    icon: Lightbulb,
+    feedbackType: 'improvement',
+  },
+];
 
 export default function ReportEntryScreen() {
   const router = useRouter();
@@ -36,8 +37,12 @@ export default function ReportEntryScreen() {
     }, [reset])
   );
 
-  const handleSelect = (label: string) => {
-    setIncidentType(label);
+  const handleSelectFeedback = (feedbackType: FeedbackType) => {
+    router.push({ pathname: '/employee/report/feedback', params: { feedbackType } });
+  };
+
+  const handleSelectOther = () => {
+    setIncidentType('Другое');
     router.push('/employee/report/description');
   };
 
@@ -50,11 +55,11 @@ export default function ReportEntryScreen() {
         </View>
 
         <View style={styles.list}>
-          {INCIDENT_TYPES.map(({ label, icon: Icon }) => (
+          {FEEDBACK_OPTIONS.map(({ label, icon: Icon, feedbackType }) => (
             <Pressable
-              key={label}
+              key={feedbackType}
               style={({ pressed }) => [styles.optionCard, pressed && styles.optionCardPressed]}
-              onPress={() => handleSelect(label)}
+              onPress={() => handleSelectFeedback(feedbackType)}
             >
               <View style={styles.optionIcon}>
                 <Icon size={18} color={colors.gold} strokeWidth={1.6} />
@@ -63,6 +68,17 @@ export default function ReportEntryScreen() {
               <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
             </Pressable>
           ))}
+
+          <Pressable
+            style={({ pressed }) => [styles.optionCard, pressed && styles.optionCardPressed]}
+            onPress={handleSelectOther}
+          >
+            <View style={styles.optionIcon}>
+              <HelpCircle size={18} color={colors.gold} strokeWidth={1.6} />
+            </View>
+            <Text style={[type.body, styles.optionLabel]}>Другое</Text>
+            <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
+          </Pressable>
         </View>
       </SafeAreaView>
     </ScreenBackground>
