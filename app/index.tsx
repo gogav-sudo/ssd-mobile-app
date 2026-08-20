@@ -8,7 +8,13 @@ import { Logo } from '@/components/ui/Logo';
 import { colors, spacing, type } from '@/theme';
 import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
 import { useEmployee } from '@/context/EmployeeContext';
+
+// Looking up a saved device identity should never leave the user stuck on
+// the splash screen — if Supabase doesn't answer in time, fall back to
+// showing the entry buttons instead of spinning forever.
+const LOOKUP_TIMEOUT_MS = 8000;
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -26,17 +32,18 @@ export default function SplashScreen() {
           return;
         }
 
-        const { data, error } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('telegram_chat_id', deviceId)
-          .maybeSingle();
+        const { data, error } = await withTimeout(
+          supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
+          LOOKUP_TIMEOUT_MS
+        );
 
         if (!isMounted) return;
 
         if (!error && data) {
           setEmployee(data);
         }
+      } catch {
+        // Timed out or failed — fall through to showing the entry buttons.
       } finally {
         if (isMounted) setChecking(false);
       }
@@ -54,16 +61,19 @@ export default function SplashScreen() {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('telegram_chat_id', deviceId)
-      .maybeSingle();
+    try {
+      const { data, error } = await withTimeout(
+        supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
+        LOOKUP_TIMEOUT_MS
+      );
 
-    if (!error && data) {
-      setEmployee(data);
-      router.replace('/employee');
-    } else {
+      if (!error && data) {
+        setEmployee(data);
+        router.replace('/employee');
+      } else {
+        router.push('/employee-onboarding/name');
+      }
+    } catch {
       router.push('/employee-onboarding/name');
     }
   }, [router, setEmployee]);

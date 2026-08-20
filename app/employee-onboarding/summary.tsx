@@ -9,33 +9,15 @@ import { useOnboarding } from '@/context/OnboardingContext';
 import { useEmployee } from '@/context/EmployeeContext';
 import { createDeviceIdentityId } from '@/lib/deviceIdentity';
 import { supabase } from '@/lib/supabase';
+import { withTimeout } from '@/lib/withTimeout';
+
+const SAVE_TIMEOUT_MS = 12000;
 
 const FIELDS: Array<{ key: 'fullName' | 'objectName' | 'role'; label: string }> = [
   { key: 'fullName', label: 'ФИО' },
   { key: 'objectName', label: 'Объект' },
   { key: 'role', label: 'Должность' },
 ];
-
-// Guards against a stalled network request (e.g. tunnelled dev preview)
-// leaving the button stuck on "Сохраняем…" forever with no feedback.
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error('Сервер не отвечает. Проверьте подключение и попробуйте снова.')),
-      ms
-    );
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (err) => {
-        clearTimeout(timer);
-        reject(err);
-      }
-    );
-  });
-}
 
 export default function SummaryScreen() {
   const router = useRouter();
@@ -64,14 +46,15 @@ export default function SummaryScreen() {
 
       const { error } = await withTimeout(
         supabase.from('employees').insert(payload),
-        12000
+        SAVE_TIMEOUT_MS
       );
 
       if (error) throw error;
 
       // Re-fetch by telegram_chat_id instead of chaining .select().single()
-      // onto the insert — some network paths (e.g. tunnelled dev previews)
-      // can stall waiting on the combined insert+representation response.
+      // onto the insert — the combined insert+representation response can
+      // stall on some network paths (e.g. tunnelled dev previews) even
+      // though the insert itself already succeeded server-side.
       const { data: inserted, error: fetchError } = await withTimeout(
         supabase
           .from('employees')
@@ -80,7 +63,7 @@ export default function SummaryScreen() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        12000
+        SAVE_TIMEOUT_MS
       );
 
       if (fetchError) throw fetchError;
