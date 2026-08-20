@@ -16,6 +16,13 @@ import { useEmployee } from '@/context/EmployeeContext';
 // showing the entry buttons instead of spinning forever.
 const LOOKUP_TIMEOUT_MS = 8000;
 
+function lookupEmployeeByDeviceId(deviceId: string) {
+  return withTimeout(
+    supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
+    LOOKUP_TIMEOUT_MS
+  );
+}
+
 export default function SplashScreen() {
   const router = useRouter();
   const { setEmployee } = useEmployee();
@@ -23,38 +30,50 @@ export default function SplashScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    console.log('[Splash] Mount — starting device identity check.');
 
     (async () => {
       try {
+        console.log('[Splash] Reading device_identity_id from AsyncStorage…');
         const deviceId = await getDeviceIdentityId();
+        console.log('[Splash] device_identity_id =', deviceId);
+
         if (!deviceId) {
+          console.log('[Splash] No saved identity — showing entry buttons.');
           if (isMounted) setChecking(false);
           return;
         }
 
-        const { data, error } = await withTimeout(
-          supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
-          LOOKUP_TIMEOUT_MS
-        );
+        console.log('[Splash] Querying employees for telegram_chat_id =', deviceId);
+        const { data, error } = await lookupEmployeeByDeviceId(deviceId);
+        console.log('[Splash] Query settled. error=', error?.message ?? null, 'data=', data ? 'found' : 'none');
 
-        if (!isMounted) return;
+        if (!isMounted) {
+          console.log('[Splash] Unmounted before query settled — ignoring result.');
+          return;
+        }
 
         if (!error && data) {
+          console.log('[Splash] Employee found — pre-loading into context.');
           setEmployee(data);
         }
-      } catch {
+      } catch (err: any) {
+        console.warn('[Splash] Lookup failed or timed out:', err?.message ?? err);
         // Timed out or failed — fall through to showing the entry buttons.
       } finally {
+        console.log('[Splash] Finished checking. isMounted=', isMounted);
         if (isMounted) setChecking(false);
       }
     })();
 
     return () => {
+      console.log('[Splash] Unmount.');
       isMounted = false;
     };
   }, []);
 
   const handleEmployeeEntry = useCallback(async () => {
+    console.log('[Splash] "Войти как сотрудник" pressed.');
     const deviceId = await getDeviceIdentityId();
     if (!deviceId) {
       router.push('/employee-onboarding/name');
@@ -62,10 +81,8 @@ export default function SplashScreen() {
     }
 
     try {
-      const { data, error } = await withTimeout(
-        supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
-        LOOKUP_TIMEOUT_MS
-      );
+      const { data, error } = await lookupEmployeeByDeviceId(deviceId);
+      console.log('[Splash] Entry lookup settled. error=', error?.message ?? null, 'data=', data ? 'found' : 'none');
 
       if (!error && data) {
         setEmployee(data);
@@ -73,7 +90,8 @@ export default function SplashScreen() {
       } else {
         router.push('/employee-onboarding/name');
       }
-    } catch {
+    } catch (err: any) {
+      console.warn('[Splash] Entry lookup failed or timed out:', err?.message ?? err);
       router.push('/employee-onboarding/name');
     }
   }, [router, setEmployee]);

@@ -44,10 +44,12 @@ export default function SummaryScreen() {
         role: data.role,
       };
 
+      console.log('[Summary] Inserting employee row for deviceId =', deviceId);
       const { error } = await withTimeout(
         supabase.from('employees').insert(payload),
         SAVE_TIMEOUT_MS
       );
+      console.log('[Summary] Insert settled. error=', error?.message ?? null);
 
       if (error) throw error;
 
@@ -55,6 +57,7 @@ export default function SummaryScreen() {
       // onto the insert — the combined insert+representation response can
       // stall on some network paths (e.g. tunnelled dev previews) even
       // though the insert itself already succeeded server-side.
+      console.log('[Summary] Re-fetching inserted row…');
       const { data: inserted, error: fetchError } = await withTimeout(
         supabase
           .from('employees')
@@ -65,6 +68,7 @@ export default function SummaryScreen() {
           .maybeSingle(),
         SAVE_TIMEOUT_MS
       );
+      console.log('[Summary] Re-fetch settled. error=', fetchError?.message ?? null, 'found=', !!inserted);
 
       if (fetchError) throw fetchError;
 
