@@ -16,6 +16,27 @@ const FIELDS: Array<{ key: 'fullName' | 'objectName' | 'role'; label: string }> 
   { key: 'role', label: 'Должность' },
 ];
 
+// Guards against a stalled network request (e.g. tunnelled dev preview)
+// leaving the button stuck on "Сохраняем…" forever with no feedback.
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Сервер не отвечает. Проверьте подключение и попробуйте снова.')),
+      ms
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 export default function SummaryScreen() {
   const router = useRouter();
   const { data, reset } = useOnboarding();
@@ -41,15 +62,39 @@ export default function SummaryScreen() {
         role: data.role,
       };
 
-      const { data: inserted, error } = await supabase
-        .from('employees')
-        .insert(payload)
-        .select()
-        .single();
+      const { error } = await withTimeout(
+        supabase.from('employees').insert(payload),
+        12000
+      );
 
       if (error) throw error;
 
-      setEmployee(inserted);
+      // Re-fetch by telegram_chat_id instead of chaining .select().single()
+      // onto the insert — some network paths (e.g. tunnelled dev previews)
+      // can stall waiting on the combined insert+representation response.
+      const { data: inserted, error: fetchError } = await withTimeout(
+        supabase
+          .from('employees')
+          .select('*')
+          .eq('telegram_chat_id', deviceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        12000
+      );
+
+      if (fetchError) throw fetchError;
+
+      setEmployee(
+        inserted ?? {
+          id: 0,
+          created_at: new Date().toISOString(),
+          telegram_chat_id: deviceId,
+          full_name: data.fullName,
+          object_name: data.objectName,
+          role: data.role,
+        }
+      );
       reset();
       router.replace('/employee');
     } catch (err: any) {
