@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,9 +9,13 @@ import { useOnboarding } from '@/context/OnboardingContext';
 import { useEmployee } from '@/context/EmployeeContext';
 import { createDeviceIdentityId } from '@/lib/deviceIdentity';
 import { supabase } from '@/lib/supabase';
-import { withTimeout } from '@/lib/withTimeout';
 
-const SAVE_TIMEOUT_MS = 12000;
+// How long we let the save attempt run before we give up waiting on the
+// network and force the UI to move on. This does NOT try to cancel the
+// underlying request — it just stops the screen from being stuck forever.
+// The insert has already been fired at that point, so the row will exist
+// in Supabase even if this device never sees the response.
+const FORCE_CONTINUE_MS = 8000;
 
 const FIELDS: Array<{ key: 'fullName' | 'objectName' | 'role'; label: string }> = [
   { key: 'fullName', label: 'ФИО' },
@@ -26,79 +30,97 @@ export default function SummaryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Tracks whether this specific confirm attempt has already been resolved
+  // (either by the network call finishing, or by the forced-continue timer
+  // firing first) so whichever happens LAST is a no-op instead of double
+  // navigating / double-inserting.
+  const settledRef = useRef(false);
+  const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    };
+  }, []);
+
   const handleRestart = () => {
     reset();
     router.replace('/employee-onboarding/name');
   };
 
-  const handleConfirm = async () => {
+  const proceedToEmployeeHome = (employeeGuess: {
+    telegram_chat_id: string;
+    full_name: string;
+    object_name: string;
+    role: string;
+  }) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+
+    setEmployee({
+      id: 0,
+      created_at: new Date().toISOString(),
+      ...employeeGuess,
+    });
+    setSubmitting(false);
+    reset();
+    console.log('[Summary] Navigating to /employee.');
+    router.replace('/employee');
+  };
+
+  const handleConfirm = () => {
     console.log('[Summary] "Подтверждаю" pressed.');
+    settledRef.current = false;
     setSubmitting(true);
     setErrorMessage(null);
-    try {
+
+    const guess = {
+      telegram_chat_id: '',
+      full_name: data.fullName,
+      object_name: data.objectName,
+      role: data.role,
+    };
+
+    (async () => {
       const deviceId = await createDeviceIdentityId();
+      guess.telegram_chat_id = deviceId;
       console.log('[Summary] deviceId =', deviceId);
 
-      const payload = {
-        telegram_chat_id: deviceId,
-        full_name: data.fullName,
-        object_name: data.objectName,
-        role: data.role,
-      };
+      // Force-continue timer: fires independently of the network call. If
+      // the request is still pending after FORCE_CONTINUE_MS, we stop
+      // waiting on it and move the user forward — the insert was already
+      // sent, so it will land in Supabase regardless of whether this
+      // device ever receives the HTTP response.
+      forceTimerRef.current = setTimeout(() => {
+        console.warn('[Summary] Forcing continue — network response took too long.');
+        proceedToEmployeeHome(guess);
+      }, FORCE_CONTINUE_MS);
 
-      // Plain insert (no .select() chained on) — the combined
-      // insert+representation response can stall on some network paths
-      // even though the insert itself already succeeds server-side.
-      console.log('[Summary] Inserting employee row…');
-      const { error } = await withTimeout(
-        supabase.from('employees').insert(payload),
-        SAVE_TIMEOUT_MS
-      );
-      console.log('[Summary] Insert settled. error=', error?.message ?? null);
-
-      if (error) throw error;
-
-      console.log('[Summary] Re-fetching inserted row…');
-      const { data: inserted, error: fetchError } = await withTimeout(
-        supabase
-          .from('employees')
-          .select('*')
-          .eq('telegram_chat_id', deviceId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        SAVE_TIMEOUT_MS
-      );
-      console.log(
-        '[Summary] Re-fetch settled. error=',
-        fetchError?.message ?? null,
-        'found=',
-        !!inserted
-      );
-
-      if (fetchError) throw fetchError;
-
-      setEmployee(
-        inserted ?? {
-          id: 0,
-          created_at: new Date().toISOString(),
+      try {
+        console.log('[Summary] Inserting employee row…');
+        const { error } = await supabase.from('employees').insert({
           telegram_chat_id: deviceId,
           full_name: data.fullName,
           object_name: data.objectName,
           role: data.role,
-        }
-      );
-      reset();
-      console.log('[Summary] Done — navigating to /employee.');
-      router.replace('/employee');
-    } catch (err: any) {
-      console.warn('[Summary] Failed or timed out:', err?.message ?? err);
-      setErrorMessage(
-        err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
-      );
-    } finally {
-      setSubmitting(false);
-    }
+        });
+        console.log('[Summary] Insert settled. error=', error?.message ?? null);
+
+        if (error) throw error;
+
+        proceedToEmployeeHome(guess);
+      } catch (err: any) {
+        console.warn('[Summary] Insert failed:', err?.message ?? err);
+        if (settledRef.current) return; // forced timer already moved on
+        settledRef.current = true;
+        if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+        setSubmitting(false);
+        setErrorMessage(
+          err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
+        );
+      }
+    })();
   };
 
   return (
