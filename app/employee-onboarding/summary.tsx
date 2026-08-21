@@ -17,6 +17,27 @@ import { supabase } from '@/lib/supabase';
 // in Supabase even if this device never sees the response.
 const FORCE_CONTINUE_MS = 8000;
 
+// ---- TEMPORARY ON-SCREEN DIAGNOSTICS ----------------------------------
+// Visible directly on the screen (not just in logs) so we can see exactly
+// where execution stalls on a real device with no cable/console access.
+// Remove this block once the root cause is confirmed and fixed.
+type DebugState = {
+  startedAt: number | null;
+  timerArmed: boolean;
+  timerFired: boolean;
+  insertStatus: 'idle' | 'sent' | 'success' | 'error';
+  lastError: string | null;
+};
+
+const initialDebug: DebugState = {
+  startedAt: null,
+  timerArmed: false,
+  timerFired: false,
+  insertStatus: 'idle',
+  lastError: null,
+};
+// ------------------------------------------------------------------------
+
 const FIELDS: Array<{ key: 'fullName' | 'objectName' | 'role'; label: string }> = [
   { key: 'fullName', label: 'ФИО' },
   { key: 'objectName', label: 'Объект' },
@@ -30,16 +51,21 @@ export default function SummaryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const [debug, setDebug] = useState<DebugState>(initialDebug);
+  const [elapsedSec, setElapsedSec] = useState(0);
+
   // Tracks whether this specific confirm attempt has already been resolved
   // (either by the network call finishing, or by the forced-continue timer
   // firing first) so whichever happens LAST is a no-op instead of double
   // navigating / double-inserting.
   const settledRef = useRef(false);
   const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => {
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+      if (tickRef.current) clearInterval(tickRef.current);
     };
   }, []);
 
@@ -57,6 +83,7 @@ export default function SummaryScreen() {
     if (settledRef.current) return;
     settledRef.current = true;
     if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    if (tickRef.current) clearInterval(tickRef.current);
 
     setEmployee({
       id: 0,
@@ -65,15 +92,22 @@ export default function SummaryScreen() {
     });
     setSubmitting(false);
     reset();
-    console.log('[Summary] Navigating to /employee.');
     router.replace('/employee');
   };
 
   const handleConfirm = () => {
-    console.log('[Summary] "Подтверждаю" pressed.');
     settledRef.current = false;
     setSubmitting(true);
     setErrorMessage(null);
+
+    const startedAt = Date.now();
+    setDebug({ ...initialDebug, startedAt, timerArmed: true });
+    setElapsedSec(0);
+
+    if (tickRef.current) clearInterval(tickRef.current);
+    tickRef.current = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startedAt) / 1000));
+    }, 200);
 
     const guess = {
       telegram_chat_id: '',
@@ -85,7 +119,6 @@ export default function SummaryScreen() {
     (async () => {
       const deviceId = await createDeviceIdentityId();
       guess.telegram_chat_id = deviceId;
-      console.log('[Summary] deviceId =', deviceId);
 
       // Force-continue timer: fires independently of the network call. If
       // the request is still pending after FORCE_CONTINUE_MS, we stop
@@ -93,34 +126,43 @@ export default function SummaryScreen() {
       // sent, so it will land in Supabase regardless of whether this
       // device ever receives the HTTP response.
       forceTimerRef.current = setTimeout(() => {
-        console.warn('[Summary] Forcing continue — network response took too long.');
+        setDebug((d) => ({ ...d, timerFired: true }));
         proceedToEmployeeHome(guess);
       }, FORCE_CONTINUE_MS);
 
       try {
-        console.log('[Summary] Inserting employee row…');
+        setDebug((d) => ({ ...d, insertStatus: 'sent' }));
         const { error } = await supabase.from('employees').insert({
           telegram_chat_id: deviceId,
           full_name: data.fullName,
           object_name: data.objectName,
           role: data.role,
         });
-        console.log('[Summary] Insert settled. error=', error?.message ?? null);
 
         if (error) throw error;
 
+        setDebug((d) => ({ ...d, insertStatus: 'success' }));
         proceedToEmployeeHome(guess);
       } catch (err: any) {
-        console.warn('[Summary] Insert failed:', err?.message ?? err);
+        const message = err?.message ?? String(err);
+        setDebug((d) => ({ ...d, insertStatus: 'error', lastError: message }));
         if (settledRef.current) return; // forced timer already moved on
         settledRef.current = true;
         if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+        if (tickRef.current) clearInterval(tickRef.current);
         setSubmitting(false);
         setErrorMessage(
-          err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
+          message || 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
         );
       }
     })();
+  };
+
+  const insertStatusLabel: Record<DebugState['insertStatus'], string> = {
+    idle: 'не отправлен',
+    sent: 'ещё выполняется',
+    success: 'завершён успешно',
+    error: 'завершён с ошибкой',
   };
 
   return (
@@ -151,6 +193,25 @@ export default function SummaryScreen() {
 
         <View style={styles.footer}>
           <Button label="Подтверждаю" onPress={handleConfirm} loading={submitting} />
+
+          {/* TEMPORARY ON-SCREEN DIAGNOSTICS — remove after root cause is confirmed */}
+          {debug.startedAt ? (
+            <View style={styles.debugBox}>
+              <Text style={styles.debugTitle}>ДИАГНОСТИКА (временно)</Text>
+              <Text style={styles.debugLine}>
+                Таймер запущен: {debug.timerArmed ? 'ДА' : 'НЕТ'}
+              </Text>
+              <Text style={styles.debugLine}>Прошло секунд: {elapsedSec}</Text>
+              <Text style={styles.debugLine}>
+                Insert запрос: {insertStatusLabel[debug.insertStatus]}
+              </Text>
+              <Text style={styles.debugLine}>
+                Таймер сработал: {debug.timerFired ? 'ДА' : 'НЕТ'}
+              </Text>
+              <Text style={styles.debugLine}>Ошибка: {debug.lastError ?? '—'}</Text>
+            </View>
+          ) : null}
+
           <View style={{ height: spacing.md }} />
           <Button
             label="Начать заново"
@@ -217,5 +278,25 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
+  },
+  debugBox: {
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.gold,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+  },
+  debugTitle: {
+    color: colors.gold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: spacing.sm,
+    fontWeight: '700',
+  },
+  debugLine: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
