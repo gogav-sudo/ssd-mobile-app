@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,29 +8,41 @@ import { Logo } from '@/components/ui/Logo';
 import { colors, spacing, type } from '@/theme';
 import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { supabase } from '@/lib/supabase';
-import { withTimeout } from '@/lib/withTimeout';
 import { useEmployee } from '@/context/EmployeeContext';
 
-// Looking up a saved device identity should never leave the user stuck on
-// the splash screen — if Supabase doesn't answer in time, fall back to
-// showing the entry buttons instead of spinning forever.
+console.log('[Splash] Module evaluating (app/index.tsx loaded).');
+
+// How long we wait on the "do I already have an account" lookup before we
+// give up and just show the entry buttons. This is a plain setTimeout race,
+// NOT an AbortController — it does not try to cancel the network request,
+// it only stops the SCREEN from waiting on it forever.
 const LOOKUP_TIMEOUT_MS = 8000;
 
-function lookupEmployeeByDeviceId(deviceId: string) {
-  return withTimeout(
-    supabase.from('employees').select('*').eq('telegram_chat_id', deviceId).maybeSingle(),
-    LOOKUP_TIMEOUT_MS
-  );
-}
-
 export default function SplashScreen() {
+  console.log('[Splash] Component function called (render start).');
   const router = useRouter();
   const { setEmployee } = useEmployee();
   const [checking, setChecking] = useState(true);
 
+  // Guards against the timeout AND the real network response both trying
+  // to flip `checking` — whichever happens first wins, the second is a no-op.
+  const settledRef = useRef(false);
+
   useEffect(() => {
+    console.log('[Splash] useEffect body running.');
     let isMounted = true;
-    console.log('[Splash] Mount — starting device identity check.');
+    settledRef.current = false;
+
+    const stopChecking = () => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      if (isMounted) setChecking(false);
+    };
+
+    const forceTimer = setTimeout(() => {
+      console.warn('[Splash] Lookup timed out after', LOOKUP_TIMEOUT_MS, 'ms — showing entry buttons.');
+      stopChecking();
+    }, LOOKUP_TIMEOUT_MS);
 
     (async () => {
       try {
@@ -40,12 +52,17 @@ export default function SplashScreen() {
 
         if (!deviceId) {
           console.log('[Splash] No saved identity — showing entry buttons.');
-          if (isMounted) setChecking(false);
+          clearTimeout(forceTimer);
+          stopChecking();
           return;
         }
 
         console.log('[Splash] Querying employees for telegram_chat_id =', deviceId);
-        const { data, error } = await lookupEmployeeByDeviceId(deviceId);
+        const { data, error } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('telegram_chat_id', deviceId)
+          .maybeSingle();
         console.log(
           '[Splash] Query settled. error=',
           error?.message ?? null,
@@ -53,8 +70,9 @@ export default function SplashScreen() {
           data ? 'found' : 'none'
         );
 
-        if (!isMounted) {
-          console.log('[Splash] Unmounted before query settled — ignoring result.');
+        clearTimeout(forceTimer);
+        if (settledRef.current || !isMounted) {
+          console.log('[Splash] Already settled by timeout, or unmounted — ignoring result.');
           return;
         }
 
@@ -62,18 +80,18 @@ export default function SplashScreen() {
           console.log('[Splash] Employee found — pre-loading into context.');
           setEmployee(data);
         }
+        stopChecking();
       } catch (err: any) {
-        console.warn('[Splash] Lookup failed or timed out:', err?.message ?? err);
-        // Timed out or failed — fall through to showing the entry buttons.
-      } finally {
-        console.log('[Splash] Finished checking. isMounted=', isMounted);
-        if (isMounted) setChecking(false);
+        console.warn('[Splash] Lookup threw:', err?.message ?? err);
+        clearTimeout(forceTimer);
+        stopChecking();
       }
     })();
 
     return () => {
-      console.log('[Splash] Unmount.');
+      console.log('[Splash] Unmount / effect cleanup.');
       isMounted = false;
+      clearTimeout(forceTimer);
     };
   }, []);
 
@@ -86,7 +104,11 @@ export default function SplashScreen() {
     }
 
     try {
-      const { data, error } = await lookupEmployeeByDeviceId(deviceId);
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('telegram_chat_id', deviceId)
+        .maybeSingle();
       console.log(
         '[Splash] Entry lookup settled. error=',
         error?.message ?? null,
@@ -101,7 +123,7 @@ export default function SplashScreen() {
         router.push('/employee-onboarding/name');
       }
     } catch (err: any) {
-      console.warn('[Splash] Entry lookup failed or timed out:', err?.message ?? err);
+      console.warn('[Splash] Entry lookup threw:', err?.message ?? err);
       router.push('/employee-onboarding/name');
     }
   }, [router, setEmployee]);
@@ -109,6 +131,8 @@ export default function SplashScreen() {
   const handleSupervisorEntry = useCallback(() => {
     router.push('/supervisor-pin');
   }, [router]);
+
+  console.log('[Splash] Rendering. checking=', checking);
 
   return (
     <SplashBackground>

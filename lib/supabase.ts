@@ -2,8 +2,17 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
+console.log('[supabase.ts] Module evaluating — reading env vars.');
+
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+console.log(
+  '[supabase.ts] URL configured:',
+  Boolean(supabaseUrl),
+  'Anon key configured:',
+  Boolean(supabaseAnonKey)
+);
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
@@ -19,6 +28,8 @@ export const supabase = createClient(
     },
   }
 );
+
+console.log('[supabase.ts] createClient() returned — module fully evaluated.');
 
 // ---- Types matching the existing schema (read/write only, never altered) ----
 
