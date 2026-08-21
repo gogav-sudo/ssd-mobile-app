@@ -32,10 +32,12 @@ export default function SummaryScreen() {
   };
 
   const handleConfirm = async () => {
+    console.log('[Summary] "Подтверждаю" pressed.');
     setSubmitting(true);
     setErrorMessage(null);
     try {
       const deviceId = await createDeviceIdentityId();
+      console.log('[Summary] deviceId =', deviceId);
 
       const payload = {
         telegram_chat_id: deviceId,
@@ -44,7 +46,10 @@ export default function SummaryScreen() {
         role: data.role,
       };
 
-      console.log('[Summary] Inserting employee row for deviceId =', deviceId);
+      // Plain insert (no .select() chained on) — the combined
+      // insert+representation response can stall on some network paths
+      // even though the insert itself already succeeds server-side.
+      console.log('[Summary] Inserting employee row…');
       const { error } = await withTimeout(
         supabase.from('employees').insert(payload),
         SAVE_TIMEOUT_MS
@@ -53,10 +58,6 @@ export default function SummaryScreen() {
 
       if (error) throw error;
 
-      // Re-fetch by telegram_chat_id instead of chaining .select().single()
-      // onto the insert — the combined insert+representation response can
-      // stall on some network paths (e.g. tunnelled dev previews) even
-      // though the insert itself already succeeded server-side.
       console.log('[Summary] Re-fetching inserted row…');
       const { data: inserted, error: fetchError } = await withTimeout(
         supabase
@@ -68,7 +69,12 @@ export default function SummaryScreen() {
           .maybeSingle(),
         SAVE_TIMEOUT_MS
       );
-      console.log('[Summary] Re-fetch settled. error=', fetchError?.message ?? null, 'found=', !!inserted);
+      console.log(
+        '[Summary] Re-fetch settled. error=',
+        fetchError?.message ?? null,
+        'found=',
+        !!inserted
+      );
 
       if (fetchError) throw fetchError;
 
@@ -83,8 +89,10 @@ export default function SummaryScreen() {
         }
       );
       reset();
+      console.log('[Summary] Done — navigating to /employee.');
       router.replace('/employee');
     } catch (err: any) {
+      console.warn('[Summary] Failed or timed out:', err?.message ?? err);
       setErrorMessage(
         err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
       );

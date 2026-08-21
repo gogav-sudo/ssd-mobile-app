@@ -3,10 +3,10 @@
 // with no feedback, even though the server may have already responded.
 //
 // IMPORTANT: Promise.race alone does NOT cancel the underlying request —
-// it just stops *waiting* on it. If the caller is a Supabase PostgrestBuilder
-// (a "thenable", not a real Promise until you call .then()), an AbortController
-// signal is threaded through so the actual fetch() is aborted too, not just
-// abandoned in the background.
+// it just stops *waiting* on it. Supabase query builders are "thenables"
+// that expose .abortSignal(signal), so we thread a real AbortController
+// through and abort the actual fetch() when the timeout fires, instead of
+// just abandoning it in the background.
 export function withTimeout<T>(
   builder: { abortSignal: (signal: AbortSignal) => PromiseLike<T> },
   ms: number,

@@ -46,7 +46,12 @@ export default function SplashScreen() {
 
         console.log('[Splash] Querying employees for telegram_chat_id =', deviceId);
         const { data, error } = await lookupEmployeeByDeviceId(deviceId);
-        console.log('[Splash] Query settled. error=', error?.message ?? null, 'data=', data ? 'found' : 'none');
+        console.log(
+          '[Splash] Query settled. error=',
+          error?.message ?? null,
+          'data=',
+          data ? 'found' : 'none'
+        );
 
         if (!isMounted) {
           console.log('[Splash] Unmounted before query settled — ignoring result.');
@@ -82,7 +87,12 @@ export default function SplashScreen() {
 
     try {
       const { data, error } = await lookupEmployeeByDeviceId(deviceId);
-      console.log('[Splash] Entry lookup settled. error=', error?.message ?? null, 'data=', data ? 'found' : 'none');
+      console.log(
+        '[Splash] Entry lookup settled. error=',
+        error?.message ?? null,
+        'data=',
+        data ? 'found' : 'none'
+      );
 
       if (!error && data) {
         setEmployee(data);
