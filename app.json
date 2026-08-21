@@ -1,7 +1,8 @@
-{
+﻿{
   "expo": {
     "name": "СД — Секьюрити Сервис Делюкс",
-    "slug": "sd-security-service-deluxe",
+    "slug": "ssd-mobile-app",
+    "owner": "gogavs-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +13,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.secservicedeluxe.ssdmobileapp",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -45,6 +47,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b381a33e-ad5b-431e-81d6-9e61ad68261e"
+      }
     }
   }
 }
