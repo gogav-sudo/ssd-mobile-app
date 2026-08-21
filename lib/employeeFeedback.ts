@@ -1,5 +1,6 @@
 import { supabase, EmployeeFeedback } from './supabase';
 import { todayIsoDate } from './date';
+import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
 
 export type FeedbackType = 'blocker' | 'improvement';
 
@@ -42,6 +43,7 @@ export type EmployeeFeedbackFilter = {
 };
 
 // Chronological list for supervisors, with optional type + date-range filters.
+// Falls back to an empty list if the network stalls.
 export async function getEmployeeFeedback(
   filter: EmployeeFeedbackFilter
 ): Promise<EmployeeFeedback[]> {
@@ -57,23 +59,33 @@ export async function getEmployeeFeedback(
     query = query.lte('created_at', `${filter.dateTo}T23:59:59`);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  const result = await raceWithTimeout(
+    query.order('created_at', { ascending: false }),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getEmployeeFeedback'
+  );
 
-  if (error) throw error;
-  return data ?? [];
+  if (result.timedOut) return [];
+  if (result.error) throw result.error;
+  return result.data ?? [];
 }
 
 // Count of feedback entries created since the start of today (device-local),
-// used for the dashboard link card.
+// used for the dashboard link card. Falls back to 0 if the network stalls.
 export async function getEmployeeFeedbackTodayCount(): Promise<number> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
-  const { count, error } = await supabase
-    .from('employee_feedback')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', startOfDay.toISOString());
+  const result = await raceWithTimeout(
+    supabase
+      .from('employee_feedback')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', startOfDay.toISOString()),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getEmployeeFeedbackTodayCount'
+  );
 
-  if (error) throw error;
-  return count ?? 0;
+  if (result.timedOut) return 0;
+  if (result.error) throw result.error;
+  return result.count ?? 0;
 }

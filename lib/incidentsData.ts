@@ -1,4 +1,5 @@
 import { supabase, Incident } from './supabase';
+import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
 
 export type IncidentStatus = 'new' | 'in_progress' | 'resolved';
 
@@ -18,6 +19,7 @@ export type IncidentsFilter = {
   urgency: IncidentUrgencyFilter;
 };
 
+// Falls back to an empty list if the network stalls.
 export async function getIncidents(filter: IncidentsFilter): Promise<Incident[]> {
   let query = supabase.from('incidents').select('*');
 
@@ -34,21 +36,28 @@ export async function getIncidents(filter: IncidentsFilter): Promise<Incident[]>
     query = query.eq('urgency', filter.urgency);
   }
 
-  const { data, error } = await query.order('created_at', { ascending: false });
+  const result = await raceWithTimeout(
+    query.order('created_at', { ascending: false }),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getIncidents'
+  );
 
-  if (error) throw error;
-  return data ?? [];
+  if (result.timedOut) return [];
+  if (result.error) throw result.error;
+  return result.data ?? [];
 }
 
+// Falls back to `null` if the network stalls.
 export async function getIncidentById(id: number): Promise<Incident | null> {
-  const { data, error } = await supabase
-    .from('incidents')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const result = await raceWithTimeout(
+    supabase.from('incidents').select('*').eq('id', id).maybeSingle(),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getIncidentById'
+  );
 
-  if (error) throw error;
-  return data;
+  if (result.timedOut) return null;
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 export async function updateIncidentStatus(id: number, status: IncidentStatus): Promise<void> {
@@ -56,9 +65,16 @@ export async function updateIncidentStatus(id: number, status: IncidentStatus): 
   if (error) throw error;
 }
 
+// Falls back to an empty list if the network stalls.
 export async function getDistinctIncidentObjectNames(): Promise<string[]> {
-  const { data, error } = await supabase.from('incidents').select('object_name');
-  if (error) throw error;
-  const set = new Set((data ?? []).map((row) => row.object_name).filter(Boolean));
+  const result = await raceWithTimeout(
+    supabase.from('incidents').select('object_name'),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getDistinctIncidentObjectNames'
+  );
+
+  if (result.timedOut) return [];
+  if (result.error) throw result.error;
+  const set = new Set((result.data ?? []).map((row) => row.object_name).filter(Boolean));
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
 }

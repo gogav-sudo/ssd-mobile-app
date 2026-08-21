@@ -1,4 +1,5 @@
 import { supabase, KnowledgeBaseEntry } from './supabase';
+import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
 
 const EDGE_FUNCTION_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''}/functions/v1/search-knowledge-base`;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -113,25 +114,33 @@ export function getTopicBySlug(slug: string): KnowledgeTopic | undefined {
   return KNOWLEDGE_TOPICS.find((t) => t.slug === slug);
 }
 
+// Falls back to an empty list if the network stalls.
 export async function getArticlesForTopic(topic: KnowledgeTopic): Promise<KnowledgeBaseEntry[]> {
-  const { data, error } = await supabase
-    .from('knowledge_base')
-    .select('*')
-    .in('category', topic.categories)
-    .eq('is_active', true)
-    .order('priority', { ascending: true });
+  const result = await raceWithTimeout(
+    supabase
+      .from('knowledge_base')
+      .select('*')
+      .in('category', topic.categories)
+      .eq('is_active', true)
+      .order('priority', { ascending: true }),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getArticlesForTopic'
+  );
 
-  if (error) throw error;
-  return data ?? [];
+  if (result.timedOut) return [];
+  if (result.error) throw result.error;
+  return result.data ?? [];
 }
 
+// Falls back to `null` if the network stalls.
 export async function getArticleById(id: number): Promise<KnowledgeBaseEntry | null> {
-  const { data, error } = await supabase
-    .from('knowledge_base')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+  const result = await raceWithTimeout(
+    supabase.from('knowledge_base').select('*').eq('id', id).maybeSingle(),
+    DEFAULT_QUERY_TIMEOUT_MS,
+    'getArticleById'
+  );
 
-  if (error) throw error;
-  return data;
+  if (result.timedOut) return null;
+  if (result.error) throw result.error;
+  return result.data;
 }
