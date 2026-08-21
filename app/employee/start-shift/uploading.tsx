@@ -13,6 +13,16 @@ import { uploadStartShiftPhoto } from '@/lib/shifts';
 import { todayIsoDate } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 
+// Photo upload + shift insert is a WRITE, not a read — unlike raceWithTimeout
+// (lib/withFallbackTimeout.ts), we cannot fall back to empty/null data on
+// timeout: we don't know whether the storage upload or the insert actually
+// landed. So on timeout we surface an explicit error and let the person
+// retry, instead of silently continuing or guessing forward. Re-uploading
+// is safe (upsert: true on the storage object), but a retry after a
+// timed-out-but-actually-succeeded insert can leave a duplicate 'open' row
+// for the day — acceptable trade-off vs. leaving the screen stuck forever.
+const UPLOAD_TIMEOUT_MS = 10000;
+
 export default function UploadingScreen() {
   const router = useRouter();
   const { data, setShiftId } = useStartShift();
@@ -20,14 +30,37 @@ export default function UploadingScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const startedRef = useRef(false);
 
+  // Same idea as app/employee-onboarding/summary.tsx: tracks whether this
+  // attempt has already been resolved (by the request finishing, or by the
+  // force timer firing first) so whichever happens LAST is a no-op.
+  const settledRef = useRef(false);
+  const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
     run();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    };
+  }, []);
+
   const run = async () => {
     setErrorMessage(null);
+    settledRef.current = false;
+
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    forceTimerRef.current = setTimeout(() => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      setErrorMessage(
+        'Загрузка занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
+      );
+    }, UPLOAD_TIMEOUT_MS);
+
     try {
       if (!data.photoUri || !employee) throw new Error('Недостаточно данных для начала смены.');
 
@@ -52,9 +85,16 @@ export default function UploadingScreen() {
 
       if (error) throw error;
 
+      if (settledRef.current) return; // force timer already showed the error
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+
       setShiftId(inserted.id);
       router.replace('/employee/start-shift/uniform-check');
     } catch (err: any) {
+      if (settledRef.current) return; // force timer already fired
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setErrorMessage(
         err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
       );

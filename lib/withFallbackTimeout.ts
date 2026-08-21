@@ -13,7 +13,13 @@
 // response shape, since that's every call site in this app. On timeout,
 // `timedOut` is true and both data/count are null — callers just check
 // `timedOut` first and use their own empty fallback (null, [], or 0).
-export type SupabaseLikeResponse = { error: unknown } & Record<string, unknown>;
+// Deliberately NOT intersected with `Record<string, unknown>`: Supabase's
+// response types (PostgrestSingleResponse and friends) are a discriminated
+// union without an index signature, so requiring one here breaks structural
+// assignability at every call site and cascades into spurious `{}`/`unknown`
+// errors on `.data`/`.count` downstream. `{ error: unknown }` is all this
+// helper actually relies on.
+export type SupabaseLikeResponse = { error: unknown };
 
 export type RaceResult<T extends SupabaseLikeResponse> =
   | ({ timedOut: true } & { [K in keyof T]: null })
