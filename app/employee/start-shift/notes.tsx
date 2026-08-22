@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { WizardLayout } from '@/components/ui/WizardLayout';
@@ -7,6 +7,11 @@ import { useStartShift } from '@/context/StartShiftContext';
 import { supabase } from '@/lib/supabase';
 import { colors, radius, spacing, type } from '@/theme';
 
+// Same idea as app/employee/start-shift/uploading.tsx: this is a WRITE, so on
+// timeout we surface an explicit error and let the person retry rather than
+// silently continuing — we don't know whether the update actually landed.
+const SAVE_TIMEOUT_MS = 8000;
+
 export default function NotesScreen() {
   const router = useRouter();
   const { data, setNotes } = useStartShift();
@@ -14,9 +19,33 @@ export default function NotesScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Tracks whether this attempt has already been resolved (by the request
+  // finishing, or by the force timer firing first) so whichever happens LAST
+  // is a no-op.
+  const settledRef = useRef(false);
+  const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    };
+  }, []);
+
   const finalize = async (notes: string) => {
     setSubmitting(true);
     setErrorMessage(null);
+    settledRef.current = false;
+
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    forceTimerRef.current = setTimeout(() => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      setSubmitting(false);
+      setErrorMessage(
+        'Сохранение занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
+      );
+    }, SAVE_TIMEOUT_MS);
+
     try {
       if (!data.shiftId) throw new Error('Смена не найдена. Попробуйте начать заново.');
 
@@ -31,14 +60,21 @@ export default function NotesScreen() {
 
       if (error) throw error;
 
+      if (settledRef.current) return; // force timer already showed the error
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+
       setNotes(notes);
+      setSubmitting(false);
       router.replace('/employee/start-shift/success');
     } catch (err: any) {
+      if (settledRef.current) return; // force timer already fired
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+      setSubmitting(false);
       setErrorMessage(
         err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
       );
-    } finally {
-      setSubmitting(false);
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,6 +21,11 @@ import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { createResidentQuestion, getTodayResidentQuestions } from '@/lib/residentQuestions';
 import type { ResidentQuestion } from '@/lib/supabase';
 
+// Same idea as app/employee/start-shift/uploading.tsx: this is a WRITE, so on
+// timeout we surface an explicit error and let the person retry rather than
+// silently continuing — we don't know whether the insert actually landed.
+const SAVE_TIMEOUT_MS = 8000;
+
 export default function EmployeeQuestionsScreen() {
   const { employee } = useEmployee();
   const [value, setValue] = useState('');
@@ -30,6 +35,18 @@ export default function EmployeeQuestionsScreen() {
 
   const [questions, setQuestions] = useState<ResidentQuestion[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Tracks whether this attempt has already been resolved (by the request
+  // finishing, or by the force timer firing first) so whichever happens LAST
+  // is a no-op.
+  const settledRef = useRef(false);
+  const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    };
+  }, []);
 
   const loadToday = useCallback(async () => {
     setLoading(true);
@@ -61,6 +78,18 @@ export default function EmployeeQuestionsScreen() {
     setSaving(true);
     setErrorMessage(null);
     setJustSaved(false);
+    settledRef.current = false;
+
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    forceTimerRef.current = setTimeout(() => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      setSaving(false);
+      setErrorMessage(
+        'Сохранение занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
+      );
+    }, SAVE_TIMEOUT_MS);
+
     try {
       const deviceId = employee?.telegram_chat_id ?? (await getDeviceIdentityId());
       if (!deviceId || !employee) {
@@ -74,14 +103,21 @@ export default function EmployeeQuestionsScreen() {
         questionText,
       });
 
+      if (settledRef.current) return; // force timer already showed the error
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+
       setQuestions((current) => [created, ...current]);
       setValue('');
       setJustSaved(true);
+      setSaving(false);
       setTimeout(() => setJustSaved(false), 2200);
     } catch (err: any) {
-      setErrorMessage(err?.message ?? 'Не удалось сохранить вопрос. Попробуйте снова.');
-    } finally {
+      if (settledRef.current) return; // force timer already fired
+      settledRef.current = true;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setSaving(false);
+      setErrorMessage(err?.message ?? 'Не удалось сохранить вопрос. Попробуйте снова.');
     }
   };
 
