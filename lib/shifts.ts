@@ -1,7 +1,16 @@
-import { File } from 'expo-file-system';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
+
+// @supabase/storage-js's upload() calls body.has('cacheControl') when given
+// a FormData instance (StorageFileApi.ts, uploadOrUpdate) — a web FormData
+// method. React Native's FormData polyfill (Libraries/Network/FormData.js)
+// only implements append()/getAll()/getParts(), so without this shim the
+// upload throws "body.has is not a function" before ever reaching the
+// network. Documented workaround for Supabase Storage uploads from RN.
+if (typeof FormData !== 'undefined' && !FormData.prototype.has) {
+  FormData.prototype.has = () => false;
+}
 
 // Looks up today's open shift for this device, if any.
 // Falls back to `null` (treated as "no open shift") if the network stalls —
@@ -97,19 +106,24 @@ export async function closeShift(
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
   const fileName = `${deviceId}_${todayIsoDate()}.jpg`;
 
-  // Confirmed via device testing: fetch(localUri) on a file:// / content://
-  // URI can hang indefinitely on Android (RN's fetch polyfill reading local
-  // files is a different, less reliable code path than an actual network
-  // fetch). expo-file-system's File.bytes() reads the file through the
-  // native module directly, with no RN networking layer involved.
-  console.log('[uploadStartShiftPhoto] Reading local file bytes via File.bytes()...', localUri);
-  const bytes = await new File(localUri).bytes();
-  console.log('[uploadStartShiftPhoto] File.bytes() resolved. bytes.length =', bytes.length);
+  // Confirmed via device testing: a raw ArrayBuffer/Uint8Array body passed
+  // to fetch() never reaches the network on Android. React Native's
+  // XMLHttpRequest forwards the body to the native bridge unconverted (the
+  // convertRequestBody.js helper that would base64-encode it exists in RN
+  // but is never called), and the native Networking module - which only
+  // recognizes {string}/{blob}/{formData}/{uri}/{base64} - never dispatches
+  // a request from it. A FormData part shaped as { uri, name, type } *is* a
+  // form RN's bridge natively supports: the native side reads the file at
+  // `uri` and streams it directly, without this JS function touching its
+  // bytes at all.
+  console.log('[uploadStartShiftPhoto] Building FormData for', localUri);
+  const formData = new FormData();
+  formData.append('', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
 
   console.log('[uploadStartShiftPhoto] Calling supabase.storage.upload()...', fileName);
   const { error: uploadError } = await supabase.storage
     .from('shift-photos')
-    .upload(fileName, bytes, {
+    .upload(fileName, formData, {
       contentType: 'image/jpeg',
       upsert: true,
     });
