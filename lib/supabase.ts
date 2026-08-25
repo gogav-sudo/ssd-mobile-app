@@ -4,13 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 
 console.log('[supabase.ts] Module evaluating — reading env vars.');
 
-// TEMPORARY DIAGNOSTIC TEST — NOT the final config. Normally this is
-// proxied through a Cloudflare Worker at a Russian domain (ssd-api.ru)
-// because mobile carriers in Russia block direct access to *.supabase.co.
-// Pointed straight at Supabase here to check whether photo upload works
-// over a direct connection, isolating whether the proxy is the culprit.
-// Revert to 'https://ssd-api.ru' once this test is done.
-const supabaseUrl = 'https://iggelhbmkelizqjizxjw.supabase.co';
+// Proxied through a Cloudflare Worker at a Russian domain because mobile
+// carriers in Russia block direct access to *.supabase.co.
+const supabaseUrl = 'https://ssd-api.ru';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 console.log(
