@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
@@ -116,24 +117,43 @@ export async function uploadStartShiftPhoto(deviceId: string, localUri: string):
   // form RN's bridge natively supports: the native side reads the file at
   // `uri` and streams it directly, without this JS function touching its
   // bytes at all.
-  console.log('[uploadStartShiftPhoto] Building FormData for', localUri);
-  const formData = new FormData();
-  formData.append('', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
-
-  console.log('[uploadStartShiftPhoto] Calling supabase.storage.upload()...', fileName);
-  const { error: uploadError } = await supabase.storage
-    .from('shift-photos')
-    .upload(fileName, formData, {
-      contentType: 'image/jpeg',
-      upsert: true,
-    });
-  console.log(
-    '[uploadStartShiftPhoto] storage.upload() settled. error=',
-    uploadError?.message ?? null
+  // TEMPORARY DIAGNOSTIC TEST — NOT the final path. Bypasses supabase-js's
+  // storage.upload() entirely and hits a temporary debug endpoint on the
+  // Worker directly via FileSystem.uploadAsync(), to isolate whether the
+  // upload stall is caused by supabase-js's request construction or by
+  // something further down (network/proxy/Worker). Remove this block and
+  // restore the real supabase.storage.upload() call below once done.
+  console.log('[uploadStartShiftPhoto] DEBUG: starting FileSystem.uploadAsync() test...', localUri);
+  const debugResult = await FileSystem.uploadAsync(
+    'https://ssd-api.ru/debug/upload-test',
+    localUri,
+    {
+      httpMethod: 'POST',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: { 'Content-Type': 'image/jpeg' },
+    }
   );
+  console.log('[uploadStartShiftPhoto] DEBUG upload result:', debugResult.status, debugResult.body);
 
-  if (uploadError) throw uploadError;
+  // const formData = new FormData();
+  // formData.append('', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
+  //
+  // console.log('[uploadStartShiftPhoto] Calling supabase.storage.upload()...', fileName);
+  // const { error: uploadError } = await supabase.storage
+  //   .from('shift-photos')
+  //   .upload(fileName, formData, {
+  //     contentType: 'image/jpeg',
+  //     upsert: true,
+  //   });
+  // console.log(
+  //   '[uploadStartShiftPhoto] storage.upload() settled. error=',
+  //   uploadError?.message ?? null
+  // );
+  //
+  // if (uploadError) throw uploadError;
+  //
+  // const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
+  // return data.publicUrl;
 
-  const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
-  return data.publicUrl;
+  return '';
 }
