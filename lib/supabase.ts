@@ -4,7 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 
 console.log('[supabase.ts] Module evaluating — reading env vars.');
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+// Proxied through a Cloudflare Worker at a Russian domain because mobile
+// carriers in Russia block direct access to *.supabase.co.
+const supabaseUrl = 'https://ssd-api.ru';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 console.log(
