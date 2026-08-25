@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SplashBackground } from '@/components/ui/SplashBackground';
@@ -17,42 +17,27 @@ const LOOKUP_TIMEOUT_MS = 8000;
 export default function SplashScreen() {
   console.log('[Splash] Component function called (render start).');
   const router = useRouter();
-  const { setEmployee } = useEmployee();
-  const [checking, setChecking] = useState(true);
+  const { employee, setEmployee } = useEmployee();
   const [entryLoading, setEntryLoading] = useState(false);
 
-  const settledRef = useRef(false);
   const entrySettledRef = useRef(false);
   const entryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Buttons render immediately (see below) - this effect only warms up the
+  // context in the background so a returning employee's tap on "Voyti kak
+  // sotrudnik" can skip straight to their home screen instead of hitting
+  // onboarding. It must never block the initial render, so there is no
+  // "checking" state and no force-timer gating the UI - the lookup just
+  // resolves whenever it resolves, or is silently abandoned on unmount.
   useEffect(() => {
-    console.log('[Splash] useEffect body running.');
+    console.log('[Splash] Background identity warm-up starting.');
     let isMounted = true;
-    settledRef.current = false;
-
-    const stopChecking = () => {
-      if (settledRef.current) return;
-      settledRef.current = true;
-      if (isMounted) setChecking(false);
-    };
-
-    const forceTimer = setTimeout(() => {
-      console.warn('[Splash] Lookup timed out after', LOOKUP_TIMEOUT_MS, 'ms - showing entry buttons.');
-      stopChecking();
-    }, LOOKUP_TIMEOUT_MS);
 
     (async () => {
       try {
-        console.log('[Splash] Reading device_identity_id from AsyncStorage...');
         const deviceId = await getDeviceIdentityId();
         console.log('[Splash] device_identity_id =', deviceId);
-
-        if (!deviceId) {
-          console.log('[Splash] No saved identity - showing entry buttons.');
-          clearTimeout(forceTimer);
-          stopChecking();
-          return;
-        }
+        if (!deviceId || !isMounted) return;
 
         console.log('[Splash] Querying employees for telegram_chat_id =', deviceId);
         const { data, error } = await supabase
@@ -61,39 +46,39 @@ export default function SplashScreen() {
           .eq('telegram_chat_id', deviceId)
           .maybeSingle();
         console.log(
-          '[Splash] Query settled. error=',
+          '[Splash] Background query settled. error=',
           error?.message ?? null,
           'data=',
           data ? 'found' : 'none'
         );
 
-        clearTimeout(forceTimer);
-        if (settledRef.current || !isMounted) {
-          console.log('[Splash] Already settled by timeout, or unmounted - ignoring result.');
-          return;
-        }
-
+        if (!isMounted) return;
         if (!error && data) {
           console.log('[Splash] Employee found - pre-loading into context.');
           setEmployee(data);
         }
-        stopChecking();
       } catch (err: any) {
-        console.warn('[Splash] Lookup threw:', err?.message ?? err);
-        clearTimeout(forceTimer);
-        stopChecking();
+        console.warn('[Splash] Background warm-up threw:', err?.message ?? err);
       }
     })();
 
     return () => {
       console.log('[Splash] Unmount / effect cleanup.');
       isMounted = false;
-      clearTimeout(forceTimer);
     };
   }, []);
 
   const handleEmployeeEntry = useCallback(() => {
     console.log('[Splash] "Voyti kak sotrudnik" pressed.');
+
+    // Background warm-up already found this device's employee - skip the
+    // lookup entirely and go straight to their home screen.
+    if (employee) {
+      console.log('[Splash] Employee already warmed up in context - skipping lookup.');
+      router.replace('/employee');
+      return;
+    }
+
     entrySettledRef.current = false;
     setEntryLoading(true);
 
@@ -156,13 +141,13 @@ export default function SplashScreen() {
         goToOnboarding();
       }
     })();
-  }, [router, setEmployee]);
+  }, [employee, router, setEmployee]);
 
   const handleSupervisorEntry = useCallback(() => {
     router.push('/supervisor-pin');
   }, [router]);
 
-  console.log('[Splash] Rendering. checking=', checking, 'entryLoading=', entryLoading);
+  console.log('[Splash] Rendering. entryLoading=', entryLoading);
 
   return (
     <SplashBackground>
@@ -172,27 +157,18 @@ export default function SplashScreen() {
         </View>
 
         <View style={styles.footer}>
-          {checking ? (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color={colors.gold} />
-              <Text style={[type.caption, styles.loadingText]}>ПРОВЕРКА ДАННЫХ...</Text>
-            </View>
-          ) : (
-            <>
-              <Button
-                label="Войти как сотрудник"
-                onPress={handleEmployeeEntry}
-                loading={entryLoading}
-              />
-              <View style={{ height: spacing.md }} />
-              <Button
-                label="Войти как руководитель"
-                variant="secondary"
-                onPress={handleSupervisorEntry}
-                disabled={entryLoading}
-              />
-            </>
-          )}
+          <Button
+            label="Войти как сотрудник"
+            onPress={handleEmployeeEntry}
+            loading={entryLoading}
+          />
+          <View style={{ height: spacing.md }} />
+          <Button
+            label="Войти как руководитель"
+            variant="secondary"
+            onPress={handleSupervisorEntry}
+            disabled={entryLoading}
+          />
           <Text style={[type.caption, styles.version]}>ВНУТРЕННЯЯ СИСТЕМА · v1.0</Text>
         </View>
       </SafeAreaView>
@@ -213,17 +189,6 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xl,
-  },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  loadingText: {
-    color: colors.textSecondary,
-    marginLeft: spacing.sm,
   },
   version: {
     textAlign: 'center',
