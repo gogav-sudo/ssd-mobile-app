@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
@@ -96,12 +97,16 @@ export async function closeShift(
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
   const fileName = `${deviceId}_${todayIsoDate()}.jpg`;
 
-  const response = await fetch(localUri);
-  const arrayBuffer = await response.arrayBuffer();
+  // Confirmed via device testing: fetch(localUri) on a file:// / content://
+  // URI can hang indefinitely on Android (RN's fetch polyfill reading local
+  // files is a different, less reliable code path than an actual network
+  // fetch). expo-file-system's File.bytes() reads the file through the
+  // native module directly, with no RN networking layer involved.
+  const bytes = await new File(localUri).bytes();
 
   const { error: uploadError } = await supabase.storage
     .from('shift-photos')
-    .upload(fileName, arrayBuffer, {
+    .upload(fileName, bytes, {
       contentType: 'image/jpeg',
       upsert: true,
     });
