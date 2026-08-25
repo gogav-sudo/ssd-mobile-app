@@ -49,6 +49,7 @@ export default function UploadingScreen() {
   }, []);
 
   const run = async () => {
+    console.log('[Uploading] run() starting.');
     setErrorMessage(null);
     settledRef.current = false;
 
@@ -56,6 +57,7 @@ export default function UploadingScreen() {
     forceTimerRef.current = setTimeout(() => {
       if (settledRef.current) return;
       settledRef.current = true;
+      console.warn('[Uploading] Timed out after', UPLOAD_TIMEOUT_MS, 'ms - showing error.');
       setErrorMessage(
         'Загрузка занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
       );
@@ -64,11 +66,16 @@ export default function UploadingScreen() {
     try {
       if (!data.photoUri || !employee) throw new Error('Недостаточно данных для начала смены.');
 
+      console.log('[Uploading] Reading device_identity_id from AsyncStorage...');
       const deviceId = await getDeviceIdentityId();
+      console.log('[Uploading] device_identity_id =', deviceId);
       if (!deviceId) throw new Error('Не удалось определить устройство.');
 
+      console.log('[Uploading] Uploading photo to Storage...');
       const publicUrl = await uploadStartShiftPhoto(deviceId, data.photoUri);
+      console.log('[Uploading] Photo uploaded. publicUrl =', publicUrl);
 
+      console.log('[Uploading] Inserting shift row...');
       const { data: inserted, error } = await supabase
         .from('shifts')
         .insert({
@@ -82,16 +89,26 @@ export default function UploadingScreen() {
         })
         .select()
         .single();
+      console.log(
+        '[Uploading] Insert settled. error=',
+        error?.message ?? null,
+        'shiftId=',
+        inserted?.id ?? null
+      );
 
       if (error) throw error;
 
-      if (settledRef.current) return; // force timer already showed the error
+      if (settledRef.current) {
+        console.log('[Uploading] Already settled by timeout - ignoring result.');
+        return;
+      }
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
       setShiftId(inserted.id);
       router.replace('/employee/start-shift/uniform-check');
     } catch (err: any) {
+      console.warn('[Uploading] run() threw:', err?.message ?? err);
       if (settledRef.current) return; // force timer already fired
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
