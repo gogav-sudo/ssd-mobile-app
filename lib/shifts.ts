@@ -102,14 +102,21 @@ export async function uploadStartShiftPhoto(deviceId: string, localUri: string):
   // files is a different, less reliable code path than an actual network
   // fetch). expo-file-system's File.bytes() reads the file through the
   // native module directly, with no RN networking layer involved.
+  console.log('[uploadStartShiftPhoto] Reading local file bytes via File.bytes()...', localUri);
   const bytes = await new File(localUri).bytes();
+  console.log('[uploadStartShiftPhoto] File.bytes() resolved. bytes.length =', bytes.length);
 
+  console.log('[uploadStartShiftPhoto] Calling supabase.storage.upload()...', fileName);
   const { error: uploadError } = await supabase.storage
     .from('shift-photos')
     .upload(fileName, bytes, {
       contentType: 'image/jpeg',
       upsert: true,
     });
+  console.log(
+    '[uploadStartShiftPhoto] storage.upload() settled. error=',
+    uploadError?.message ?? null
+  );
 
   if (uploadError) throw uploadError;
 
