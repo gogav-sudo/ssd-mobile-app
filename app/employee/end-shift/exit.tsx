@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalendarX } from 'lucide-react-native';
@@ -19,23 +19,26 @@ export default function EndShiftExitScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <View style={styles.iconWrap}>
-            <CalendarX size={26} color={colors.gold} strokeWidth={1.6} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.center}>
+            <View style={styles.iconWrap}>
+              <CalendarX size={26} color={colors.gold} strokeWidth={1.6} />
+            </View>
+            <Text style={[type.h2, styles.title]}>{title}</Text>
           </View>
-          <Text style={[type.h2, styles.title]}>{title}</Text>
-        </View>
 
-        <View style={styles.footer}>
-          <Button label="Вернуться на главную" onPress={() => router.replace('/employee')} />
-        </View>
+          <View style={styles.footer}>
+            <Button label="Вернуться на главную" onPress={() => router.replace('/employee')} />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, justifyContent: 'space-between' },
+  safe: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,
     alignItems: 'center',

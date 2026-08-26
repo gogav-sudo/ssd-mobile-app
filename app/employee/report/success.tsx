@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle2 } from 'lucide-react-native';
@@ -19,32 +19,35 @@ export default function ReportSuccessScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <View style={styles.iconWrap}>
-            <CheckCircle2 size={30} color={colors.gold} strokeWidth={1.5} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.center}>
+            <View style={styles.iconWrap}>
+              <CheckCircle2 size={30} color={colors.gold} strokeWidth={1.5} />
+            </View>
+            <Text style={[type.h1, styles.title]}>Проблема зафиксирована</Text>
           </View>
-          <Text style={[type.h1, styles.title]}>Проблема зафиксирована</Text>
-        </View>
 
-        <View style={styles.footer}>
-          <Button
-            label="Вернуться на главную"
-            onPress={() => {
-              // Reset this tab's own stack back to incident-type selection
-              // first, so reopening "Сообщить о проблеме" later never lands
-              // back on this success screen — then leave to Home.
-              router.replace('/employee/report');
-              setTimeout(() => router.replace('/employee'), 0);
-            }}
-          />
-        </View>
+          <View style={styles.footer}>
+            <Button
+              label="Вернуться на главную"
+              onPress={() => {
+                // Reset this tab's own stack back to incident-type selection
+                // first, so reopening "Сообщить о проблеме" later never lands
+                // back on this success screen — then leave to Home.
+                router.replace('/employee/report');
+                setTimeout(() => router.replace('/employee'), 0);
+              }}
+            />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, justifyContent: 'space-between' },
+  safe: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,
     alignItems: 'center',

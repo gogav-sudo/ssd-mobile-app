@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, X } from 'lucide-react-native';
 import { Pressable } from 'react-native';
@@ -62,13 +62,19 @@ export function WizardLayout({
             ) : null}
           </View>
 
-          <View style={styles.body}>
-            {eyebrow ? <Text style={[type.label, styles.eyebrow]}>{eyebrow}</Text> : null}
-            <Text style={[type.h1, styles.question]}>{question}</Text>
-            {children ? <View style={styles.inputArea}>{children}</View> : null}
-          </View>
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.body}>
+              {eyebrow ? <Text style={[type.label, styles.eyebrow]}>{eyebrow}</Text> : null}
+              <Text style={[type.h1, styles.question]}>{question}</Text>
+              {children ? <View style={styles.inputArea}>{children}</View> : null}
+            </View>
 
-          <View style={styles.footer}>{footer}</View>
+            <View style={styles.footer}>{footer}</View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ScreenBackground>
@@ -114,8 +120,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+  },
   body: {
-    flex: 1,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxl,
   },

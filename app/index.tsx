@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SplashBackground } from '@/components/ui/SplashBackground';
@@ -152,25 +152,27 @@ export default function SplashScreen() {
   return (
     <SplashBackground>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <Logo size={112} />
-        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.center}>
+            <Logo size={112} />
+          </View>
 
-        <View style={styles.footer}>
-          <Button
-            label="Войти как сотрудник"
-            onPress={handleEmployeeEntry}
-            loading={entryLoading}
-          />
-          <View style={{ height: spacing.md }} />
-          <Button
-            label="Войти как руководитель"
-            variant="secondary"
-            onPress={handleSupervisorEntry}
-            disabled={entryLoading}
-          />
-          <Text style={[type.caption, styles.version]}>ВНУТРЕННЯЯ СИСТЕМА · v1.0</Text>
-        </View>
+          <View style={styles.footer}>
+            <Button
+              label="Войти как сотрудник"
+              onPress={handleEmployeeEntry}
+              loading={entryLoading}
+            />
+            <View style={{ height: spacing.md }} />
+            <Button
+              label="Войти как руководитель"
+              variant="secondary"
+              onPress={handleSupervisorEntry}
+              disabled={entryLoading}
+            />
+            <Text style={[type.caption, styles.version]}>ВНУТРЕННЯЯ СИСТЕМА · v1.0</Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </SplashBackground>
   );
@@ -179,6 +181,9 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'space-between',
   },
   center: {

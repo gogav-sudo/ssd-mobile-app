@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
@@ -168,65 +168,68 @@ export default function SummaryScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.body}>
-          <Text style={[type.label, styles.label]}>ПРОВЕРЬТЕ ДАННЫЕ</Text>
-          <Text style={[type.h1, styles.title]}>Всё верно?</Text>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.body}>
+            <Text style={[type.label, styles.label]}>ПРОВЕРЬТЕ ДАННЫЕ</Text>
+            <Text style={[type.h1, styles.title]}>Всё верно?</Text>
 
-          <View style={styles.card}>
-            {FIELDS.map((field, index) => (
-              <View
-                key={field.key}
-                style={[styles.row, index === FIELDS.length - 1 && styles.rowLast]}
-              >
-                <Text style={[type.caption, styles.rowLabel]}>{field.label}</Text>
-                <Text style={[type.body, styles.rowValue]}>{data[field.key]}</Text>
+            <View style={styles.card}>
+              {FIELDS.map((field, index) => (
+                <View
+                  key={field.key}
+                  style={[styles.row, index === FIELDS.length - 1 && styles.rowLast]}
+                >
+                  <Text style={[type.caption, styles.rowLabel]}>{field.label}</Text>
+                  <Text style={[type.body, styles.rowValue]}>{data[field.key]}</Text>
+                </View>
+              ))}
+            </View>
+
+            {errorMessage ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
-            ))}
+            ) : null}
           </View>
 
-          {errorMessage ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          ) : null}
-        </View>
+          <View style={styles.footer}>
+            <Button label="Подтверждаю" onPress={handleConfirm} loading={submitting} />
 
-        <View style={styles.footer}>
-          <Button label="Подтверждаю" onPress={handleConfirm} loading={submitting} />
+            {/* TEMPORARY ON-SCREEN DIAGNOSTICS — remove after root cause is confirmed */}
+            {debug.startedAt ? (
+              <View style={styles.debugBox}>
+                <Text style={styles.debugTitle}>ДИАГНОСТИКА (временно)</Text>
+                <Text style={styles.debugLine}>
+                  Таймер запущен: {debug.timerArmed ? 'ДА' : 'НЕТ'}
+                </Text>
+                <Text style={styles.debugLine}>Прошло секунд: {elapsedSec}</Text>
+                <Text style={styles.debugLine}>
+                  Insert запрос: {insertStatusLabel[debug.insertStatus]}
+                </Text>
+                <Text style={styles.debugLine}>
+                  Таймер сработал: {debug.timerFired ? 'ДА' : 'НЕТ'}
+                </Text>
+                <Text style={styles.debugLine}>Ошибка: {debug.lastError ?? '—'}</Text>
+              </View>
+            ) : null}
 
-          {/* TEMPORARY ON-SCREEN DIAGNOSTICS — remove after root cause is confirmed */}
-          {debug.startedAt ? (
-            <View style={styles.debugBox}>
-              <Text style={styles.debugTitle}>ДИАГНОСТИКА (временно)</Text>
-              <Text style={styles.debugLine}>
-                Таймер запущен: {debug.timerArmed ? 'ДА' : 'НЕТ'}
-              </Text>
-              <Text style={styles.debugLine}>Прошло секунд: {elapsedSec}</Text>
-              <Text style={styles.debugLine}>
-                Insert запрос: {insertStatusLabel[debug.insertStatus]}
-              </Text>
-              <Text style={styles.debugLine}>
-                Таймер сработал: {debug.timerFired ? 'ДА' : 'НЕТ'}
-              </Text>
-              <Text style={styles.debugLine}>Ошибка: {debug.lastError ?? '—'}</Text>
-            </View>
-          ) : null}
-
-          <View style={{ height: spacing.md }} />
-          <Button
-            label="Начать заново"
-            variant="secondary"
-            onPress={handleRestart}
-            disabled={submitting}
-          />
-        </View>
+            <View style={{ height: spacing.md }} />
+            <Button
+              label="Начать заново"
+              variant="secondary"
+              onPress={handleRestart}
+              disabled={submitting}
+            />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, justifyContent: 'space-between' },
+  safe: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   body: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.xxl,

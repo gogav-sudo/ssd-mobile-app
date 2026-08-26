@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertTriangle } from 'lucide-react-native';
@@ -121,43 +121,46 @@ export default function UploadingScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          {errorMessage ? (
-            <>
-              <View style={styles.iconWrap}>
-                <AlertTriangle size={26} color={colors.error} strokeWidth={1.6} />
-              </View>
-              <Text style={[type.h2, styles.title]}>Ошибка</Text>
-              <Text style={[type.bodySmall, styles.message]}>{errorMessage}</Text>
-            </>
-          ) : (
-            <>
-              <ActivityIndicator size="large" color={colors.gold} />
-              <Text style={[type.bodySmall, styles.loadingText]}>
-                Загружаем фото и открываем смену…
-              </Text>
-            </>
-          )}
-        </View>
-
-        {errorMessage ? (
-          <View style={styles.footer}>
-            <Button label="Повторить" onPress={run} />
-            <View style={{ height: spacing.md }} />
-            <Button
-              label="Вернуться на главную"
-              variant="secondary"
-              onPress={() => router.replace('/employee')}
-            />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.center}>
+            {errorMessage ? (
+              <>
+                <View style={styles.iconWrap}>
+                  <AlertTriangle size={26} color={colors.error} strokeWidth={1.6} />
+                </View>
+                <Text style={[type.h2, styles.title]}>Ошибка</Text>
+                <Text style={[type.bodySmall, styles.message]}>{errorMessage}</Text>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color={colors.gold} />
+                <Text style={[type.bodySmall, styles.loadingText]}>
+                  Загружаем фото и открываем смену…
+                </Text>
+              </>
+            )}
           </View>
-        ) : null}
+
+          {errorMessage ? (
+            <View style={styles.footer}>
+              <Button label="Повторить" onPress={run} />
+              <View style={{ height: spacing.md }} />
+              <Button
+                label="Вернуться на главную"
+                variant="secondary"
+                onPress={() => router.replace('/employee')}
+              />
+            </View>
+          ) : null}
+        </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, justifyContent: 'space-between' },
+  safe: { flex: 1 },
+  scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,
     alignItems: 'center',
