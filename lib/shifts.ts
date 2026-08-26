@@ -105,55 +105,16 @@ export async function closeShift(
 
 // Uploads the start-of-shift photo to the shift-photos bucket and returns its public URL.
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
-  const fileName = `${deviceId}_${todayIsoDate()}.jpg`;
+  console.log('[PHOTO DEBUG] localUri =', localUri);
+  console.log('[PHOTO DEBUG] uriScheme =', localUri?.split(':')[0]);
 
-  // Confirmed via device testing: a raw ArrayBuffer/Uint8Array body passed
-  // to fetch() never reaches the network on Android. React Native's
-  // XMLHttpRequest forwards the body to the native bridge unconverted (the
-  // convertRequestBody.js helper that would base64-encode it exists in RN
-  // but is never called), and the native Networking module - which only
-  // recognizes {string}/{blob}/{formData}/{uri}/{base64} - never dispatches
-  // a request from it. A FormData part shaped as { uri, name, type } *is* a
-  // form RN's bridge natively supports: the native side reads the file at
-  // `uri` and streams it directly, without this JS function touching its
-  // bytes at all.
-  // TEMPORARY DIAGNOSTIC TEST — NOT the final path. Bypasses supabase-js's
-  // storage.upload() entirely and hits a temporary debug endpoint on the
-  // Worker directly via FileSystem.uploadAsync(), to isolate whether the
-  // upload stall is caused by supabase-js's request construction or by
-  // something further down (network/proxy/Worker). Remove this block and
-  // restore the real supabase.storage.upload() call below once done.
-  console.log('[uploadStartShiftPhoto] DEBUG: starting FileSystem.uploadAsync() test...', localUri);
-  const debugResult = await FileSystem.uploadAsync(
-    'https://ssd-api.ru/debug/upload-test',
-    localUri,
-    {
-      httpMethod: 'POST',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-      headers: { 'Content-Type': 'image/jpeg' },
-    }
-  );
-  console.log('[uploadStartShiftPhoto] DEBUG upload result:', debugResult.status, debugResult.body);
+  try {
+    const info = await FileSystem.getInfoAsync(localUri, { size: true });
+    console.log('[PHOTO DEBUG] fileInfo =', JSON.stringify(info));
+  } catch (error) {
+    console.log('[PHOTO DEBUG] getInfo ERROR =', error instanceof Error ? error.message : String(error));
+    throw error;
+  }
 
-  // const formData = new FormData();
-  // formData.append('', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
-  //
-  // console.log('[uploadStartShiftPhoto] Calling supabase.storage.upload()...', fileName);
-  // const { error: uploadError } = await supabase.storage
-  //   .from('shift-photos')
-  //   .upload(fileName, formData, {
-  //     contentType: 'image/jpeg',
-  //     upsert: true,
-  //   });
-  // console.log(
-  //   '[uploadStartShiftPhoto] storage.upload() settled. error=',
-  //   uploadError?.message ?? null
-  // );
-  //
-  // if (uploadError) throw uploadError;
-  //
-  // const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
-  // return data.publicUrl;
-
-  return '';
+  throw new Error('PHOTO_DEBUG_STOP_AFTER_FILE_CHECK');
 }
