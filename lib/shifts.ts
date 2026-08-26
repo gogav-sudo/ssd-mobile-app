@@ -1,4 +1,3 @@
-import { fetch } from 'expo/fetch';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
@@ -105,19 +104,20 @@ export async function closeShift(
 
 // Uploads the start-of-shift photo to the shift-photos bucket and returns its public URL.
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
-  console.log('[PHOTO DEBUG] BEFORE TEXT expo/fetch');
+  const fileName = `${deviceId}_${todayIsoDate()}.jpg`;
 
-  const response = await fetch('https://ssd-api.ru/debug/upload-test', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'text/plain',
-    },
-    body: 'photo-upload-text-test',
-  });
+  const response = await fetch(localUri);
+  const arrayBuffer = await response.arrayBuffer();
 
-  const body = await response.text();
+  const { error: uploadError } = await supabase.storage
+    .from('shift-photos')
+    .upload(fileName, arrayBuffer, {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
 
-  console.log('[PHOTO DEBUG] AFTER TEXT expo/fetch', response.status, body);
+  if (uploadError) throw uploadError;
 
-  throw new Error('PHOTO_DEBUG_STOP_AFTER_TEXT_FETCH');
+  const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
+  return data.publicUrl;
 }
