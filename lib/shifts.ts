@@ -106,18 +106,30 @@ export async function closeShift(
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
   const fileName = `${deviceId}_${todayIsoDate()}.jpg`;
 
+  console.log('[PhotoUpload][A] fetch local URI starting', 'scheme=', localUri?.split(':')[0], Date.now());
   const response = await fetch(localUri);
-  const arrayBuffer = await response.arrayBuffer();
+  console.log('[PhotoUpload][B] local response received', 'status=', response.status, Date.now());
 
+  const arrayBuffer = await response.arrayBuffer();
+  console.log('[PhotoUpload][C] arrayBuffer ready', 'byteLength=', arrayBuffer.byteLength, Date.now());
+
+  console.log(
+    '[PhotoUpload][D] storage upload starting',
+    'fileName=', fileName,
+    'byteLength=', arrayBuffer.byteLength,
+    Date.now()
+  );
   const { error: uploadError } = await supabase.storage
     .from('shift-photos')
     .upload(fileName, arrayBuffer, {
       contentType: 'image/jpeg',
       upsert: true,
     });
+  console.log('[PhotoUpload][E] storage upload settled', 'error=', uploadError?.message ?? null, Date.now());
 
   if (uploadError) throw uploadError;
 
   const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
+  console.log('[PhotoUpload][F] public URL ready', Date.now());
   return data.publicUrl;
 }
