@@ -19,7 +19,7 @@ export default function EndShiftSuccessScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <View style={styles.center}>
             <View style={styles.iconWrap}>
               <CheckCircle2 size={30} color={colors.gold} strokeWidth={1.5} />
@@ -39,6 +39,7 @@ export default function EndShiftSuccessScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,

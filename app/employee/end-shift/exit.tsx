@@ -19,7 +19,7 @@ export default function EndShiftExitScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <View style={styles.center}>
             <View style={styles.iconWrap}>
               <CalendarX size={26} color={colors.gold} strokeWidth={1.6} />
@@ -38,6 +38,7 @@ export default function EndShiftExitScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,

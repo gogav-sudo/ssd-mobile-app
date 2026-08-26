@@ -22,7 +22,7 @@ export default function StartShiftExitScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <View style={styles.center}>
             <View
               style={[
@@ -50,6 +50,7 @@ export default function StartShiftExitScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   center: {
     flex: 1,

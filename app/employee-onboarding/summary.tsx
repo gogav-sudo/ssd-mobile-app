@@ -168,7 +168,7 @@ export default function SummaryScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <View style={styles.body}>
             <Text style={[type.label, styles.label]}>ПРОВЕРЬТЕ ДАННЫЕ</Text>
             <Text style={[type.h1, styles.title]}>Всё верно?</Text>
@@ -229,6 +229,7 @@ export default function SummaryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'space-between' },
   body: {
     paddingHorizontal: spacing.xl,

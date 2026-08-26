@@ -152,7 +152,7 @@ export default function SplashScreen() {
   return (
     <SplashBackground>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
           <View style={styles.center}>
             <Logo size={112} />
           </View>
@@ -180,6 +180,9 @@ export default function SplashScreen() {
 
 const styles = StyleSheet.create({
   safe: {
+    flex: 1,
+  },
+  flex: {
     flex: 1,
   },
   scrollContent: {
