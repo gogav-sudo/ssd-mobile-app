@@ -54,18 +54,6 @@ export default function EmployeeTabsLayout() {
           tabBarIcon: ({ color, size }) => <User color={color} size={size - 2} strokeWidth={1.6} />,
         }}
       />
-      <Tabs.Screen
-        name="start-shift"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="end-shift"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }
