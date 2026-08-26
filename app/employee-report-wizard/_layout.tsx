@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { colors } from '@/theme';
 
-export default function ReportLayout() {
+export default function ReportWizardLayout() {
   return (
     <Stack
       screenOptions={{

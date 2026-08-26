@@ -41,11 +41,11 @@ export default function EmployeeHomeScreen() {
 
   const handleStartShift = () => {
     if (openShift) return;
-    router.push('/employee/start-shift/confirm-identity');
+    router.push('/employee-start-shift/confirm-identity');
   };
 
   const handleEndShift = () => {
-    router.push('/employee/end-shift');
+    router.push('/employee-end-shift');
   };
 
   return (

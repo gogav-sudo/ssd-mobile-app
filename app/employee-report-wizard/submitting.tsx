@@ -83,7 +83,7 @@ export default function ReportSubmittingScreen() {
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
-      router.replace('/employee/report/success');
+      router.replace('/employee-report-wizard/success');
     } catch (err: any) {
       if (settledRef.current) return; // force timer already fired
       settledRef.current = true;

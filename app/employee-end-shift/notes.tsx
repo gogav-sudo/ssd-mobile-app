@@ -57,7 +57,7 @@ export default function EndShiftNotesScreen() {
 
       setNotes(notes);
       setSubmitting(false);
-      router.replace('/employee/end-shift/success');
+      router.replace('/employee-end-shift/success');
     } catch (err: any) {
       if (settledRef.current) return; // force timer already fired
       settledRef.current = true;

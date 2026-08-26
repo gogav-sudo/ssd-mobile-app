@@ -106,7 +106,7 @@ export default function UploadingScreen() {
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
       setShiftId(inserted.id);
-      router.replace('/employee/start-shift/uniform-check');
+      router.replace('/employee-start-shift/uniform-check');
     } catch (err: any) {
       console.warn('[Uploading] run() threw:', err?.message ?? err);
       if (settledRef.current) return; // force timer already fired

@@ -5,12 +5,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera, ImagePlus, RotateCcw } from 'lucide-react-native';
 import { WizardLayout } from '@/components/ui/WizardLayout';
 import { Button } from '@/components/ui/Button';
-import { useStartShift } from '@/context/StartShiftContext';
+import { useReportProblem } from '@/context/ReportProblemContext';
 import { colors, radius, spacing, type } from '@/theme';
 
-export default function StartShiftPhotoScreen() {
+export default function ReportPhotoScreen() {
   const router = useRouter();
-  const { data, setPhotoUri } = useStartShift();
+  const { data, setPhotoUri } = useReportProblem();
   const [busy, setBusy] = useState(false);
 
   const handleTakePhoto = async () => {
@@ -54,32 +54,25 @@ export default function StartShiftPhotoScreen() {
   };
 
   const handleContinue = () => {
-    router.push('/employee/start-shift/uploading');
+    router.push('/employee-report-wizard/urgency');
   };
 
   return (
     <WizardLayout
       step={3}
-      totalSteps={6}
-      eyebrow="НАЧАЛО СМЕНЫ"
-      question="Фото на посту"
+      totalSteps={5}
+      eyebrow="СООБЩИТЬ О ПРОБЛЕМЕ"
+      question="Фото проблемы"
       footer={
-        <Button
-          label="Продолжить"
-          onPress={handleContinue}
-          disabled={!data.photoUri || busy}
-        />
+        <Button label="Продолжить" onPress={handleContinue} disabled={!data.photoUri || busy} />
       }
       onClose={() => router.replace('/employee')}
+      onBack={() => router.back()}
     >
       {data.photoUri ? (
         <View>
           <Image source={{ uri: data.photoUri }} style={styles.preview} />
-          <Pressable
-            style={styles.retakeRow}
-            onPress={() => setPhotoUri(null)}
-            hitSlop={8}
-          >
+          <Pressable style={styles.retakeRow} onPress={() => setPhotoUri(null)} hitSlop={8}>
             <RotateCcw size={14} color={colors.gold} strokeWidth={1.8} />
             <Text style={styles.retakeText}>Выбрать другое фото</Text>
           </Pressable>
@@ -87,7 +80,7 @@ export default function StartShiftPhotoScreen() {
       ) : (
         <View>
           <Text style={[type.bodySmall, styles.hint]}>
-            Требуется фотография для подтверждения начала смены на объекте.
+            Приложите фотографию, подтверждающую ситуацию.
           </Text>
 
           <Pressable

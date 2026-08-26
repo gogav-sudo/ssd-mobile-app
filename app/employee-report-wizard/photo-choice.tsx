@@ -10,13 +10,13 @@ export default function ReportPhotoChoiceScreen() {
 
   const handleYes = () => {
     setWantsPhoto(true);
-    router.push('/employee/report/photo');
+    router.push('/employee-report-wizard/photo');
   };
 
   const handleNo = () => {
     setWantsPhoto(false);
     setPhotoUri(null);
-    router.push('/employee/report/urgency');
+    router.push('/employee-report-wizard/urgency');
   };
 
   return (

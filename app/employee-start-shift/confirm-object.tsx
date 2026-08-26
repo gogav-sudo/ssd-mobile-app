@@ -16,26 +16,26 @@ export default function ConfirmObjectScreen() {
     try {
       const deviceId = await getDeviceIdentityId();
       if (!deviceId) {
-        router.replace('/employee/start-shift/exit?reason=identity');
+        router.replace('/employee-start-shift/exit?reason=identity');
         return;
       }
 
       const openShift = await getTodayOpenShift(deviceId);
 
       if (openShift) {
-        router.replace('/employee/start-shift/exit?reason=already-open');
+        router.replace('/employee-start-shift/exit?reason=already-open');
       } else {
-        router.push('/employee/start-shift/photo');
+        router.push('/employee-start-shift/photo');
       }
     } catch {
-      router.replace('/employee/start-shift/exit?reason=already-open');
+      router.replace('/employee-start-shift/exit?reason=already-open');
     } finally {
       setChecking(false);
     }
   };
 
   const handleNo = () => {
-    router.push('/employee/start-shift/exit?reason=object');
+    router.push('/employee-start-shift/exit?reason=object');
   };
 
   return (

@@ -66,7 +66,7 @@ export default function NotesScreen() {
 
       setNotes(notes);
       setSubmitting(false);
-      router.replace('/employee/start-shift/success');
+      router.replace('/employee-start-shift/success');
     } catch (err: any) {
       if (settledRef.current) return; // force timer already fired
       settledRef.current = true;

@@ -25,19 +25,19 @@ export default function EndShiftEntryScreen() {
     try {
       const deviceId = await getDeviceIdentityId();
       if (!deviceId) {
-        router.replace('/employee/end-shift/exit?reason=none');
+        router.replace('/employee-end-shift/exit?reason=none');
         return;
       }
 
       const openShift = await getTodayOpenShift(deviceId);
 
       if (!openShift) {
-        router.replace('/employee/end-shift/exit?reason=none');
+        router.replace('/employee-end-shift/exit?reason=none');
         return;
       }
 
       setShiftId(openShift.id);
-      router.replace('/employee/end-shift/equipment-check');
+      router.replace('/employee-end-shift/equipment-check');
     } catch (err: any) {
       setErrorMessage(
         err?.message ?? 'Не удалось проверить статус смены. Попробуйте снова.'

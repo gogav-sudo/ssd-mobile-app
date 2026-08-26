@@ -5,12 +5,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Camera, ImagePlus, RotateCcw } from 'lucide-react-native';
 import { WizardLayout } from '@/components/ui/WizardLayout';
 import { Button } from '@/components/ui/Button';
-import { useReportProblem } from '@/context/ReportProblemContext';
+import { useStartShift } from '@/context/StartShiftContext';
 import { colors, radius, spacing, type } from '@/theme';
 
-export default function ReportPhotoScreen() {
+export default function StartShiftPhotoScreen() {
   const router = useRouter();
-  const { data, setPhotoUri } = useReportProblem();
+  const { data, setPhotoUri } = useStartShift();
   const [busy, setBusy] = useState(false);
 
   const handleTakePhoto = async () => {
@@ -54,25 +54,32 @@ export default function ReportPhotoScreen() {
   };
 
   const handleContinue = () => {
-    router.push('/employee/report/urgency');
+    router.push('/employee-start-shift/uploading');
   };
 
   return (
     <WizardLayout
       step={3}
-      totalSteps={5}
-      eyebrow="СООБЩИТЬ О ПРОБЛЕМЕ"
-      question="Фото проблемы"
+      totalSteps={6}
+      eyebrow="НАЧАЛО СМЕНЫ"
+      question="Фото на посту"
       footer={
-        <Button label="Продолжить" onPress={handleContinue} disabled={!data.photoUri || busy} />
+        <Button
+          label="Продолжить"
+          onPress={handleContinue}
+          disabled={!data.photoUri || busy}
+        />
       }
       onClose={() => router.replace('/employee')}
-      onBack={() => router.back()}
     >
       {data.photoUri ? (
         <View>
           <Image source={{ uri: data.photoUri }} style={styles.preview} />
-          <Pressable style={styles.retakeRow} onPress={() => setPhotoUri(null)} hitSlop={8}>
+          <Pressable
+            style={styles.retakeRow}
+            onPress={() => setPhotoUri(null)}
+            hitSlop={8}
+          >
             <RotateCcw size={14} color={colors.gold} strokeWidth={1.8} />
             <Text style={styles.retakeText}>Выбрать другое фото</Text>
           </Pressable>
@@ -80,7 +87,7 @@ export default function ReportPhotoScreen() {
       ) : (
         <View>
           <Text style={[type.bodySmall, styles.hint]}>
-            Приложите фотографию, подтверждающую ситуацию.
+            Требуется фотография для подтверждения начала смены на объекте.
           </Text>
 
           <Pressable

@@ -10,7 +10,7 @@ export default function UniformCheckScreen() {
 
   const handleAnswer = (value: boolean) => {
     setUniformOk(value);
-    router.push('/employee/start-shift/equipment-check');
+    router.push('/employee-start-shift/equipment-check');
   };
 
   return (

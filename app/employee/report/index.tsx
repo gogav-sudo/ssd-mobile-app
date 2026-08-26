@@ -38,12 +38,12 @@ export default function ReportEntryScreen() {
   );
 
   const handleSelectFeedback = (feedbackType: FeedbackType) => {
-    router.push({ pathname: '/employee/report/feedback', params: { feedbackType } });
+    router.push({ pathname: '/employee-report-wizard/feedback', params: { feedbackType } });
   };
 
   const handleSelectOther = () => {
     setIncidentType('Другое');
-    router.push('/employee/report/description');
+    router.push('/employee-report-wizard/description');
   };
 
   return (

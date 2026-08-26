@@ -9,11 +9,11 @@ export default function ConfirmIdentityScreen() {
   const { employee } = useEmployee();
 
   const handleYes = () => {
-    router.push('/employee/start-shift/confirm-object');
+    router.push('/employee-start-shift/confirm-object');
   };
 
   const handleNo = () => {
-    router.push('/employee/start-shift/exit?reason=identity');
+    router.push('/employee-start-shift/exit?reason=identity');
   };
 
   return (

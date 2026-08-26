@@ -13,7 +13,7 @@ export default function ReportDescriptionScreen() {
 
   const handleContinue = () => {
     setDescription(value.trim());
-    router.push('/employee/report/photo-choice');
+    router.push('/employee-report-wizard/photo-choice');
   };
 
   return (

@@ -17,7 +17,7 @@ export default function ReportUrgencyScreen() {
 
   const handleSelect = (value: Urgency) => {
     setUrgency(value);
-    router.push('/employee/report/submitting');
+    router.push('/employee-report-wizard/submitting');
   };
 
   return (
