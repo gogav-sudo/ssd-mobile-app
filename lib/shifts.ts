@@ -1,4 +1,3 @@
-import { fetch } from 'expo/fetch';
 import { File } from 'expo-file-system';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
@@ -106,26 +105,12 @@ export async function closeShift(
 
 // Uploads the start-of-shift photo to the shift-photos bucket and returns its public URL.
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
+  console.log('[PHOTO DEBUG] ENTERED uploadStartShiftPhoto');
+  console.log('[PHOTO DEBUG] localUri =', localUri);
+
   const file = new File(localUri);
 
-  const response = await fetch('https://ssd-api.ru/debug/upload-test', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'image/jpeg',
-    },
-    body: file,
-  });
+  console.log('[PHOTO DEBUG] FILE_CONSTRUCTED');
 
-  const body = await response.text();
-
-  console.log('[PHOTO DEBUG] expo/fetch status =', response.status);
-  console.log('[PHOTO DEBUG] expo/fetch body =', body);
-
-  if (!response.ok) {
-    throw new Error(
-      `PHOTO_UPLOAD_TEST_FAILED: ${response.status} ${body}`,
-    );
-  }
-
-  return '';
+  throw new Error('PHOTO_DEBUG_STOP_AFTER_FILE_CONSTRUCTION');
 }
