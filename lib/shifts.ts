@@ -1,4 +1,5 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import { fetch } from 'expo/fetch';
+import { File } from 'expo-file-system';
 import { supabase, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
@@ -105,16 +106,26 @@ export async function closeShift(
 
 // Uploads the start-of-shift photo to the shift-photos bucket and returns its public URL.
 export async function uploadStartShiftPhoto(deviceId: string, localUri: string): Promise<string> {
-  console.log('[PHOTO DEBUG] localUri =', localUri);
-  console.log('[PHOTO DEBUG] uriScheme =', localUri?.split(':')[0]);
+  const file = new File(localUri);
 
-  try {
-    const info = await FileSystem.getInfoAsync(localUri, { size: true });
-    console.log('[PHOTO DEBUG] fileInfo =', JSON.stringify(info));
-  } catch (error) {
-    console.log('[PHOTO DEBUG] getInfo ERROR =', error instanceof Error ? error.message : String(error));
-    throw error;
+  const response = await fetch('https://ssd-api.ru/debug/upload-test', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'image/jpeg',
+    },
+    body: file,
+  });
+
+  const body = await response.text();
+
+  console.log('[PHOTO DEBUG] expo/fetch status =', response.status);
+  console.log('[PHOTO DEBUG] expo/fetch body =', body);
+
+  if (!response.ok) {
+    throw new Error(
+      `PHOTO_UPLOAD_TEST_FAILED: ${response.status} ${body}`,
+    );
   }
 
-  throw new Error('PHOTO_DEBUG_STOP_AFTER_FILE_CHECK');
+  return '';
 }
