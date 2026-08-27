@@ -3,15 +3,25 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { Button } from '@/components/ui/Button';
 import { colors, spacing, type } from '@/theme';
 import { useEndShift } from '@/context/EndShiftContext';
 import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { getTodayOpenShift } from '@/lib/shifts';
 
+// 'unknown' means the check itself failed (network/timeout) — it must never
+// be presented as "no open shift", since one could still exist server-side.
+type CheckStatus = 'checking' | 'unknown';
+
+// getTodayOpenShift goes through the ssd-api.ru proxy, which has confirmed
+// occasional latency well above the shared 8s DEFAULT_QUERY_TIMEOUT_MS — give
+// this specific status check more room before falling back to 'unknown'.
+const STATUS_CHECK_TIMEOUT_MS = 20_000;
+
 export default function EndShiftEntryScreen() {
   const router = useRouter();
   const { setShiftId } = useEndShift();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<CheckStatus>('checking');
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -21,27 +31,28 @@ export default function EndShiftEntryScreen() {
   }, []);
 
   const run = async () => {
-    setErrorMessage(null);
+    setStatus('checking');
     try {
       const deviceId = await getDeviceIdentityId();
       if (!deviceId) {
-        router.replace('/employee-end-shift/exit?reason=none');
+        setStatus('unknown');
         return;
       }
 
-      const openShift = await getTodayOpenShift(deviceId);
+      const result = await getTodayOpenShift(deviceId, STATUS_CHECK_TIMEOUT_MS);
 
-      if (!openShift) {
+      if (result.status === 'open') {
+        setShiftId(result.shift.id);
+        router.replace('/employee-end-shift/equipment-check');
+        return;
+      }
+      if (result.status === 'none') {
         router.replace('/employee-end-shift/exit?reason=none');
         return;
       }
-
-      setShiftId(openShift.id);
-      router.replace('/employee-end-shift/equipment-check');
-    } catch (err: any) {
-      setErrorMessage(
-        err?.message ?? 'Не удалось проверить статус смены. Попробуйте снова.'
-      );
+      setStatus('unknown');
+    } catch {
+      setStatus('unknown');
     }
   };
 
@@ -49,8 +60,14 @@ export default function EndShiftEntryScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          {errorMessage ? (
-            <Text style={[type.bodySmall, styles.errorText]}>{errorMessage}</Text>
+          {status === 'unknown' ? (
+            <>
+              <Text style={[type.bodySmall, styles.errorText]}>
+                Не удалось проверить статус смены. Проверьте подключение.
+              </Text>
+              <View style={{ height: spacing.lg }} />
+              <Button label="Повторить" onPress={run} />
+            </>
           ) : (
             <>
               <ActivityIndicator size="large" color={colors.gold} />

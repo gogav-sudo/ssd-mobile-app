@@ -57,7 +57,7 @@ export default function SupervisorEmployeeDetailScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <Text style={[type.label, styles.headerLabel]}>ПРОФИЛЬ СОТРУДНИКА</Text>
             <Text style={[type.h1, styles.title]}>{employee.full_name}</Text>
             <Text style={[type.bodySmall, styles.subtitle]}>
@@ -176,6 +176,7 @@ function formatDate(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

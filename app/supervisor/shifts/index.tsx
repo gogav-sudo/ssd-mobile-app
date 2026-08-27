@@ -186,6 +186,7 @@ export default function SupervisorShiftsListScreen() {
           </View>
         ) : (
           <ScrollView
+            style={styles.flex}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           >
@@ -331,6 +332,7 @@ function formatTime(iso: string | null): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   header: {
     paddingTop: spacing.lg,
     marginBottom: spacing.lg,

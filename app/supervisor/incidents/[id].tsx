@@ -81,7 +81,7 @@ export default function SupervisorIncidentDetailScreen() {
             <Text style={[type.bodySmall, styles.errorText]}>Инцидент не найден.</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.headerRow}>
               <Text style={[type.label, styles.headerLabel]}>ИНЦИДЕНТ №{incident.id}</Text>
               <View
@@ -201,6 +201,7 @@ function formatDateTime(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

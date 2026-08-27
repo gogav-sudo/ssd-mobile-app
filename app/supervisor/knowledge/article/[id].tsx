@@ -51,7 +51,7 @@ export default function SupervisorKnowledgeArticleScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <Text style={[type.label, styles.category]}>{article.category.toUpperCase()}</Text>
             <Text style={[type.h1, styles.title]}>{article.title}</Text>
 
@@ -110,6 +110,7 @@ export default function SupervisorKnowledgeArticleScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

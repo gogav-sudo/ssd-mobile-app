@@ -147,7 +147,7 @@ export default function SupervisorQuestionsListScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {questions.map((q) => (
               <View key={q.id} style={styles.card}>
                 <Text style={[type.body, styles.cardQuestion]}>{q.question_text}</Text>
@@ -236,6 +236,7 @@ function formatDateTime(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   header: {
     paddingTop: spacing.lg,
     marginBottom: spacing.lg,

@@ -4,13 +4,18 @@ import { useRouter } from 'expo-router';
 import { WizardLayout } from '@/components/ui/WizardLayout';
 import { Button } from '@/components/ui/Button';
 import { useEndShift } from '@/context/EndShiftContext';
-import { closeShift } from '@/lib/shifts';
+import { closeShift, getShiftByIdDirect, logShiftWriteOutcome } from '@/lib/shifts';
 import { colors, radius, spacing, type } from '@/theme';
 
-// Same idea as app/employee/start-shift/uploading.tsx: this is a WRITE, so on
-// timeout we surface an explicit error and let the person retry rather than
-// silently continuing — we don't know whether the update actually landed.
-const SAVE_TIMEOUT_MS = 8000;
+// This covers the WHOLE closeShift update + confirmation-read sequence
+// (both now via supabaseDirect), not just the update — 60s, matching the
+// same budget given to ensureOpenShift, since the underlying ssd-api.ru-
+// bypass network calls can occasionally take much longer than a "normal"
+// 8s read (confirmed via live testing: the proxy has, separately, taken
+// 2+ minutes on a plain GET). On timeout we surface an explicit error and
+// let the person retry rather than silently continuing — we don't know
+// whether the update actually landed.
+const SAVE_TIMEOUT_MS = 60000;
 
 export default function EndShiftNotesScreen() {
   const router = useRouter();
@@ -18,6 +23,9 @@ export default function EndShiftNotesScreen() {
   const [value, setValue] = useState(data.notes);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // The exact text of the last (possibly failed) save attempt — "Повторить
+  // сохранение" always resubmits this, never a silently-emptied value.
+  const [lastAttemptedNotes, setLastAttemptedNotes] = useState<string | null>(null);
 
   // Tracks whether this attempt has already been resolved (by the request
   // finishing, or by the force timer firing first) so whichever happens LAST
@@ -32,15 +40,26 @@ export default function EndShiftNotesScreen() {
   }, []);
 
   const finalize = async (notes: string) => {
+    if (submitting) return; // guard against parallel/double-tap invocations
     setSubmitting(true);
     setErrorMessage(null);
+    setLastAttemptedNotes(notes);
     settledRef.current = false;
+    const startedAt = Date.now();
 
     if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
     forceTimerRef.current = setTimeout(() => {
       if (settledRef.current) return;
       settledRef.current = true;
       setSubmitting(false);
+      // A network-level timeout at the screen's own force-timer — never
+      // conflate this with a server-reported failure.
+      logShiftWriteOutcome({
+        operation: 'end-notes-finalize',
+        elapsedMs: Date.now() - startedAt,
+        outcome: 'timeout',
+        shiftId: data.shiftId,
+      });
       setErrorMessage(
         'Сохранение занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
       );
@@ -49,12 +68,53 @@ export default function EndShiftNotesScreen() {
     try {
       if (!data.shiftId) throw new Error('Смена не найдена. Попробуйте начать заново.');
 
+      const normalizedNotes = notes || null;
       await closeShift(data.shiftId, { equipmentOk: data.equipmentOk, notes });
+
+      // Don't trust closeShift's own success alone — read the row back (via
+      // supabaseDirect, same as the update) and confirm it is actually
+      // closed with the notes we just sent before ever showing success.
+      const confirmation = await getShiftByIdDirect(data.shiftId);
 
       if (settledRef.current) return; // force timer already showed the error
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
+      if (confirmation.status === 'unknown') {
+        setSubmitting(false);
+        logShiftWriteOutcome({
+          operation: 'end-notes-finalize',
+          elapsedMs: Date.now() - startedAt,
+          outcome: 'network-error',
+          shiftId: data.shiftId,
+          message: 'confirmation read did not resolve',
+        });
+        setErrorMessage('Не удалось подтвердить завершение смены. Проверьте подключение и повторите.');
+        return;
+      }
+      if (
+        confirmation.status === 'not_found' ||
+        confirmation.shift.status !== 'closed' ||
+        confirmation.shift.end_notes !== normalizedNotes
+      ) {
+        setSubmitting(false);
+        logShiftWriteOutcome({
+          operation: 'end-notes-finalize',
+          elapsedMs: Date.now() - startedAt,
+          outcome: 'supabase-error',
+          shiftId: data.shiftId,
+          message: `confirmation mismatch (status=${confirmation.status})`,
+        });
+        setErrorMessage('Не удалось подтвердить завершение смены. Попробуйте снова.');
+        return;
+      }
+
+      logShiftWriteOutcome({
+        operation: 'end-notes-finalize',
+        elapsedMs: Date.now() - startedAt,
+        outcome: 'success',
+        shiftId: data.shiftId,
+      });
       setNotes(notes);
       setSubmitting(false);
       router.replace('/employee-end-shift/success');
@@ -63,10 +123,26 @@ export default function EndShiftNotesScreen() {
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setSubmitting(false);
+      logShiftWriteOutcome({
+        operation: 'end-notes-finalize',
+        elapsedMs: Date.now() - startedAt,
+        outcome: 'network-error',
+        shiftId: data.shiftId,
+        message: err?.message ?? String(err),
+      });
       setErrorMessage(
         err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
       );
     }
+  };
+
+  const handleRetry = () => {
+    if (lastAttemptedNotes !== null) finalize(lastAttemptedNotes);
+  };
+
+  const handleChangeText = (text: string) => {
+    setValue(text);
+    if (errorMessage) setErrorMessage(null);
   };
 
   return (
@@ -76,22 +152,36 @@ export default function EndShiftNotesScreen() {
       eyebrow="ЗАВЕРШЕНИЕ СМЕНЫ"
       question="Есть замечания по смене?"
       footer={
-        <View>
-          <Button
-            label="Сохранить"
-            onPress={() => finalize(value.trim())}
-            loading={submitting}
-            disabled={!value.trim()}
-          />
-          <View style={{ height: spacing.md }} />
-          <Button
-            label="Пропустить"
-            variant="secondary"
-            onPress={() => finalize('')}
-            disabled={submitting}
-          />
-          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-        </View>
+        errorMessage ? (
+          <View>
+            <Text style={styles.error}>{errorMessage}</Text>
+            <View style={{ height: spacing.md }} />
+            <Button label="Повторить сохранение" onPress={handleRetry} loading={submitting} disabled={submitting} />
+            <View style={{ height: spacing.md }} />
+            <Button
+              label="Назад"
+              variant="secondary"
+              onPress={() => router.back()}
+              disabled={submitting}
+            />
+          </View>
+        ) : (
+          <View>
+            <Button
+              label="Сохранить"
+              onPress={() => finalize(value.trim())}
+              loading={submitting}
+              disabled={!value.trim()}
+            />
+            <View style={{ height: spacing.md }} />
+            <Button
+              label="Пропустить"
+              variant="secondary"
+              onPress={() => finalize('')}
+              disabled={submitting}
+            />
+          </View>
+        )
       }
     >
       <TextInput
@@ -99,7 +189,7 @@ export default function EndShiftNotesScreen() {
         placeholder="Опишите замечания, если они есть"
         placeholderTextColor={colors.textTertiary}
         value={value}
-        onChangeText={setValue}
+        onChangeText={handleChangeText}
         multiline
         numberOfLines={5}
         textAlignVertical="top"

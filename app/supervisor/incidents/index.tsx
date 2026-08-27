@@ -198,7 +198,7 @@ export default function SupervisorIncidentsListScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {incidents.map((incident) => {
               const urgencyStyle = urgencyColor(incident.urgency);
               return (
@@ -372,6 +372,7 @@ function formatDateTime(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   header: {
     paddingTop: spacing.lg,
     marginBottom: spacing.lg,

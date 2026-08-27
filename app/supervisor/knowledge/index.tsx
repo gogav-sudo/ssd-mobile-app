@@ -67,6 +67,7 @@ export default function SupervisorKnowledgeScreen() {
     <ScreenBackground webMaxWidth={1000}>
       <SafeAreaView style={styles.safe}>
         <ScrollView
+          style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -184,6 +185,7 @@ function formatDateTime(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   scrollContent: {
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,

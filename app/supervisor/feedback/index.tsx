@@ -139,7 +139,7 @@ export default function SupervisorFeedbackListScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {items.map((item) => {
               const isBlocker = item.feedback_type === 'blocker';
               const Icon = isBlocker ? ShieldQuestion : Lightbulb;
@@ -201,6 +201,7 @@ function formatDateTime(iso: string): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   header: {
     paddingTop: spacing.lg,
     marginBottom: spacing.lg,

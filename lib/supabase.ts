@@ -31,13 +31,17 @@ export const supabase = createClient(
   }
 );
 
-// Dedicated client for Storage traffic only (shift/incident photo uploads).
-// Large uploads through the ssd-api.ru Cloudflare Worker proxy stall
-// indefinitely on some mobile networks (confirmed via Chrome DevTools:
-// request stuck at "Stalled", 0 kB transferred), so Storage requests go
-// directly to Supabase instead. Every other request (auth, table
-// reads/writes) still goes through `supabase` above, unchanged.
-export const supabaseStorage = createClient(
+// Dedicated client that bypasses the ssd-api.ru Cloudflare Worker proxy,
+// for two separate confirmed issues:
+// 1. Large Storage uploads (shift/incident photos) stall indefinitely
+//    through the proxy on some mobile networks (confirmed via Chrome
+//    DevTools: request stuck at "Stalled", 0 kB transferred).
+// 2. The CORS preflight for at least one table PATCH (see
+//    app/employee-start-shift/notes.tsx) hangs through the proxy on
+//    Android (confirmed on-device).
+// Every other request (auth, and all other table reads/writes) still goes
+// through `supabase` above, unchanged.
+export const supabaseDirect = createClient(
   process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-anon-key'
 );

@@ -52,6 +52,7 @@ export default function SupervisorShiftDetailScreen() {
           </View>
         ) : (
           <ScrollView
+            style={styles.flex}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
@@ -241,6 +242,7 @@ function formatTime(iso: string | null): string {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

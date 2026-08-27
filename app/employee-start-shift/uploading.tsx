@@ -9,25 +9,23 @@ import { colors, radius, spacing, type } from '@/theme';
 import { useStartShift } from '@/context/StartShiftContext';
 import { useEmployee } from '@/context/EmployeeContext';
 import { getDeviceIdentityId } from '@/lib/deviceIdentity';
-import { uploadStartShiftPhoto } from '@/lib/shifts';
-import { todayIsoDate } from '@/lib/date';
-import { supabase } from '@/lib/supabase';
+import { ensureOpenShift } from '@/lib/shifts';
 
-// Photo upload + shift insert is a WRITE, not a read — unlike raceWithTimeout
-// (lib/withFallbackTimeout.ts), we cannot fall back to empty/null data on
-// timeout: we don't know whether the storage upload or the insert actually
-// landed. So on timeout we surface an explicit error and let the person
-// retry, instead of silently continuing or guessing forward. Re-uploading
-// is safe (upsert: true on the storage object), but a retry after a
-// timed-out-but-actually-succeeded insert can leave a duplicate 'open' row
-// for the day — acceptable trade-off vs. leaving the screen stuck forever.
-const UPLOAD_TIMEOUT_MS = 60000;
+// This screen no longer uploads the photo itself — that already happened
+// (and was confirmed) on the photo step. It only creates/confirms the shift
+// row, via `ensureOpenShift`, which is idempotent: a retry never inserts a
+// second row, it only re-confirms whatever shiftId this attempt already has
+// (see StartShiftContext.shiftId) or checks for an existing open shift
+// before creating one. On timeout we surface an explicit error and let the
+// person retry, instead of silently continuing or guessing forward.
+const CREATE_SHIFT_TIMEOUT_MS = 60000;
 
 export default function UploadingScreen() {
   const router = useRouter();
   const { data, setShiftId } = useStartShift();
   const { employee } = useEmployee();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const startedRef = useRef(false);
 
   // Same idea as app/employee-onboarding/summary.tsx: tracks whether this
@@ -35,9 +33,6 @@ export default function UploadingScreen() {
   // force timer firing first) so whichever happens LAST is a no-op.
   const settledRef = useRef(false);
   const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // TEMP DIAGNOSTIC: tracks the last stage number ([1]-[6] below) reached by
-  // run(), so the [TIMEOUT] log can report exactly where execution stalled.
-  const lastStageRef = useRef(0);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -52,82 +47,64 @@ export default function UploadingScreen() {
   }, []);
 
   const run = async () => {
-    console.log('[Uploading] run() starting.');
+    if (busy) return; // guard against parallel/double-tap invocations of "Повторить"
+    setBusy(true);
     setErrorMessage(null);
     settledRef.current = false;
-    lastStageRef.current = 0;
 
     if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
     forceTimerRef.current = setTimeout(() => {
       if (settledRef.current) return;
       settledRef.current = true;
-      console.warn('[Uploading] Timed out after', UPLOAD_TIMEOUT_MS, 'ms - showing error.');
-      console.log('[Uploading][TIMEOUT]', Date.now(), 'lastStage=', lastStageRef.current);
+      setBusy(false);
+      console.warn('[Uploading] Timed out after', CREATE_SHIFT_TIMEOUT_MS, 'ms - showing error.');
       setErrorMessage(
-        'Загрузка занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
+        'Открытие смены занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
       );
-    }, UPLOAD_TIMEOUT_MS);
+    }, CREATE_SHIFT_TIMEOUT_MS);
 
     try {
-      if (!data.photoUri || !employee) throw new Error('Недостаточно данных для начала смены.');
+      if (data.photoUploadState !== 'uploaded' || !data.photoObjectPath || !data.photoPublicUrl) {
+        throw new Error(
+          'Фото ещё не загружено. Вернитесь на предыдущий шаг и дождитесь завершения загрузки.'
+        );
+      }
+      if (!employee) throw new Error('Недостаточно данных для начала смены.');
 
-      console.log('[Uploading] Reading device_identity_id from AsyncStorage...');
-      console.log('[Uploading][1] starting identity', Date.now());
       const deviceId = await getDeviceIdentityId();
-      console.log('[Uploading] device_identity_id =', deviceId);
-      console.log('[Uploading][2] identity ready', deviceId, Date.now());
-      lastStageRef.current = 2;
       if (!deviceId) throw new Error('Не удалось определить устройство.');
 
-      console.log('[Uploading] Uploading photo to Storage...');
-      console.log('[Uploading][3] starting photo upload', Date.now());
-      const publicUrl = await uploadStartShiftPhoto(deviceId, data.photoUri);
-      console.log('[Uploading] Photo uploaded. publicUrl =', publicUrl);
-      console.log('[Uploading][4] photo upload completed', publicUrl, Date.now());
-      lastStageRef.current = 4;
-
-      console.log('[Uploading] Inserting shift row...');
-      console.log('[Uploading][5] starting shift insert', Date.now());
-      const { data: inserted, error } = await supabase
-        .from('shifts')
-        .insert({
-          telegram_chat_id: deviceId,
-          full_name: employee.full_name,
-          object_name: employee.object_name,
-          start_time: new Date().toISOString(),
-          start_photo_url: publicUrl,
-          status: 'open',
-          shift_date: todayIsoDate(),
-        })
-        .select()
-        .single();
-      console.log(
-        '[Uploading] Insert settled. error=',
-        error?.message ?? null,
-        'shiftId=',
-        inserted?.id ?? null
-      );
-
-      if (error) throw error;
-
-      console.log('[Uploading][6] shift insert completed', Date.now());
-      lastStageRef.current = 6;
+      const result = await ensureOpenShift({
+        deviceId,
+        fullName: employee.full_name,
+        objectName: employee.object_name,
+        photoPublicUrl: data.photoPublicUrl,
+        existingShiftId: data.shiftId,
+      });
 
       if (settledRef.current) {
-        console.log('[Uploading] Already settled by timeout - ignoring result.');
-        return;
+        return; // force timer already fired
       }
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
-      setShiftId(inserted.id);
+      if (!result.ok) {
+        // Remember any id we now know about so a later retry only confirms
+        // it instead of inserting a second row.
+        if (result.shiftId) setShiftId(result.shiftId);
+        setBusy(false);
+        setErrorMessage(result.message);
+        return;
+      }
+
+      setShiftId(result.shiftId);
+      setBusy(false);
       router.replace('/employee-start-shift/uniform-check');
     } catch (err: any) {
-      console.warn('[Uploading] run() threw:', err?.message ?? err);
-      console.log('[Uploading][ERROR]', Date.now(), 'lastStage=', lastStageRef.current, err);
       if (settledRef.current) return; // force timer already fired
       settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+      setBusy(false);
       setErrorMessage(
         err?.message ?? 'Не удалось сохранить данные. Проверьте подключение и попробуйте снова.'
       );
@@ -151,7 +128,7 @@ export default function UploadingScreen() {
               <>
                 <ActivityIndicator size="large" color={colors.gold} />
                 <Text style={[type.bodySmall, styles.loadingText]}>
-                  Загружаем фото и открываем смену…
+                  Открываем смену…
                 </Text>
               </>
             )}
@@ -159,12 +136,13 @@ export default function UploadingScreen() {
 
           {errorMessage ? (
             <View style={styles.footer}>
-              <Button label="Повторить" onPress={run} />
+              <Button label="Повторить" onPress={run} loading={busy} disabled={busy} />
               <View style={{ height: spacing.md }} />
               <Button
                 label="Вернуться на главную"
                 variant="secondary"
                 onPress={() => router.replace('/employee')}
+                disabled={busy}
               />
             </View>
           ) : null}

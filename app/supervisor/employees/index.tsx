@@ -59,7 +59,7 @@ export default function SupervisorEmployeesListScreen() {
             <Text style={[type.bodySmall, styles.emptyText]}>Сотрудники пока не зарегистрированы.</Text>
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {employees.map((employee) => (
               <Pressable
                 key={employee.id}
@@ -89,6 +89,7 @@ export default function SupervisorEmployeesListScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   header: {
     paddingTop: spacing.lg,
     marginBottom: spacing.xl,

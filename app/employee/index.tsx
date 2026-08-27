@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ChevronRight, LogOut, ShieldCheck, ShieldX } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, LogOut, ShieldCheck, ShieldX } from 'lucide-react-native';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { colors, radius, spacing, type } from '@/theme';
 import { useEmployee } from '@/context/EmployeeContext';
@@ -10,26 +10,40 @@ import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { getTodayOpenShift } from '@/lib/shifts';
 import type { Shift } from '@/lib/supabase';
 
+// 'unknown' means the check itself failed (network/timeout) — it must never
+// be presented as "not open", since a real open shift could still exist
+// server-side (see lib/shifts.ts ShiftLookupResult).
+type ShiftStatus = 'checking' | 'open' | 'none' | 'unknown';
+
+// getTodayOpenShift goes through the ssd-api.ru proxy, which has confirmed
+// occasional latency well above the shared 8s DEFAULT_QUERY_TIMEOUT_MS — give
+// this specific status check more room before falling back to 'unknown'.
+const STATUS_CHECK_TIMEOUT_MS = 20_000;
+
 export default function EmployeeHomeScreen() {
   const { employee } = useEmployee();
   const router = useRouter();
+  const [shiftStatus, setShiftStatus] = useState<ShiftStatus>('checking');
   const [openShift, setOpenShift] = useState<Shift | null>(null);
-  const [loadingShift, setLoadingShift] = useState(true);
 
   const loadShiftStatus = useCallback(async () => {
-    setLoadingShift(true);
-    try {
-      const deviceId = await getDeviceIdentityId();
-      if (!deviceId) {
-        setOpenShift(null);
-        return;
-      }
-      const shift = await getTodayOpenShift(deviceId);
-      setOpenShift(shift);
-    } catch {
+    setShiftStatus('checking');
+    const deviceId = await getDeviceIdentityId();
+    if (!deviceId) {
       setOpenShift(null);
-    } finally {
-      setLoadingShift(false);
+      setShiftStatus('unknown');
+      return;
+    }
+    const result = await getTodayOpenShift(deviceId, STATUS_CHECK_TIMEOUT_MS);
+    if (result.status === 'open') {
+      setOpenShift(result.shift);
+      setShiftStatus('open');
+    } else if (result.status === 'none') {
+      setOpenShift(null);
+      setShiftStatus('none');
+    } else {
+      setOpenShift(null);
+      setShiftStatus('unknown');
     }
   }, []);
 
@@ -39,8 +53,12 @@ export default function EmployeeHomeScreen() {
     }, [loadShiftStatus])
   );
 
+  const loadingShift = shiftStatus === 'checking';
+
   const handleStartShift = () => {
-    if (openShift) return;
+    // Fail closed: only allow starting a new shift once the server has
+    // confirmed none is already open — never while checking or unknown.
+    if (shiftStatus !== 'none') return;
     router.push('/employee-start-shift/confirm-identity');
   };
 
@@ -74,22 +92,32 @@ export default function EmployeeHomeScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.statusCard,
-            openShift ? styles.statusCardOpen : styles.statusCardClosed,
-            pressed && !openShift && styles.statusCardPressed,
+            shiftStatus === 'open'
+              ? styles.statusCardOpen
+              : shiftStatus === 'unknown'
+                ? styles.statusCardUnknown
+                : styles.statusCardClosed,
+            pressed && (shiftStatus === 'none' || shiftStatus === 'unknown') && styles.statusCardPressed,
           ]}
-          onPress={handleStartShift}
-          disabled={!!openShift || loadingShift}
+          onPress={shiftStatus === 'unknown' ? loadShiftStatus : handleStartShift}
+          disabled={loadingShift || shiftStatus === 'open'}
         >
           <View
             style={[
               styles.statusIcon,
-              openShift ? styles.statusIconOpen : styles.statusIconClosed,
+              shiftStatus === 'open'
+                ? styles.statusIconOpen
+                : shiftStatus === 'unknown'
+                  ? styles.statusIconUnknown
+                  : styles.statusIconClosed,
             ]}
           >
             {loadingShift ? (
               <ActivityIndicator size="small" color={colors.gold} />
-            ) : openShift ? (
+            ) : shiftStatus === 'open' ? (
               <ShieldCheck size={20} color={colors.success} strokeWidth={1.6} />
+            ) : shiftStatus === 'unknown' ? (
+              <AlertTriangle size={20} color={colors.warning} strokeWidth={1.6} />
             ) : (
               <ShieldX size={20} color={colors.gold} strokeWidth={1.6} />
             )}
@@ -98,19 +126,23 @@ export default function EmployeeHomeScreen() {
             <Text style={[type.bodySmall, styles.statusTitle]}>
               {loadingShift
                 ? 'Проверяем статус смены…'
-                : openShift
+                : shiftStatus === 'open'
                   ? 'Смена открыта'
-                  : 'Смена не открыта'}
+                  : shiftStatus === 'unknown'
+                    ? 'Не удалось проверить статус смены'
+                    : 'Смена не открыта'}
             </Text>
             <Text style={[type.caption, styles.statusSubtitle]}>
               {loadingShift
                 ? 'Подождите'
-                : openShift
-                  ? `Начата в ${formatTime(openShift.start_time)}`
-                  : 'Нажмите, чтобы начать смену'}
+                : shiftStatus === 'open'
+                  ? `Начата в ${formatTime(openShift!.start_time)}`
+                  : shiftStatus === 'unknown'
+                    ? 'Нажмите, чтобы повторить проверку'
+                    : 'Нажмите, чтобы начать смену'}
             </Text>
           </View>
-          {!openShift && !loadingShift ? (
+          {!loadingShift && shiftStatus !== 'open' ? (
             <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
           ) : null}
         </Pressable>
@@ -186,6 +218,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  statusCardUnknown: {
+    borderColor: colors.warning,
+    backgroundColor: colors.warningMuted,
+  },
   statusCardPressed: {
     opacity: 0.8,
   },
@@ -202,6 +238,9 @@ const styles = StyleSheet.create({
   },
   statusIconOpen: {
     backgroundColor: colors.successMuted,
+  },
+  statusIconUnknown: {
+    backgroundColor: colors.warningMuted,
   },
   statusTextWrap: { flex: 1 },
   statusTitle: {
