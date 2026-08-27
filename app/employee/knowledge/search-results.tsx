@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight, FileText, SearchX } from 'lucide-react-native';
@@ -83,7 +83,7 @@ export default function KnowledgeSearchResultsScreen() {
             <Button label="Повторить" onPress={run} />
           </View>
         ) : state.status === 'candidates' ? (
-          <View style={styles.list}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             <Text style={[type.bodySmall, styles.hintText]}>
               Похоже, подходит несколько статей — выберите нужную:
             </Text>
@@ -108,7 +108,7 @@ export default function KnowledgeSearchResultsScreen() {
                 <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         ) : (
           <View style={styles.centerState}>
             <View style={styles.emptyIconWrap}>
@@ -132,6 +132,7 @@ export default function KnowledgeSearchResultsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

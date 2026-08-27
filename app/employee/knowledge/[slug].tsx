@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, BookX, ChevronRight, FileText } from 'lucide-react-native';
@@ -68,7 +68,7 @@ export default function KnowledgeTopicScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.list}>
+          <ScrollView style={styles.flex} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {articles.map((article) => (
               <Pressable
                 key={article.id}
@@ -85,7 +85,7 @@ export default function KnowledgeTopicScreen() {
                 <ChevronRight size={18} color={colors.textTertiary} strokeWidth={1.6} />
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         )}
       </SafeAreaView>
     </ScreenBackground>
@@ -94,6 +94,7 @@ export default function KnowledgeTopicScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',

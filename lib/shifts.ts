@@ -1,4 +1,4 @@
-import { supabase, Shift } from './supabase';
+import { supabase, supabaseStorage, Shift } from './supabase';
 import { todayIsoDate, currentMonthRange } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
 
@@ -119,7 +119,7 @@ export async function uploadStartShiftPhoto(deviceId: string, localUri: string):
     'byteLength=', arrayBuffer.byteLength,
     Date.now()
   );
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabaseStorage.storage
     .from('shift-photos')
     .upload(fileName, arrayBuffer, {
       contentType: 'image/jpeg',

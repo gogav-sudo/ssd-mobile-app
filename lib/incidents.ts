@@ -1,4 +1,4 @@
-import { supabase, Incident } from './supabase';
+import { supabase, supabaseStorage, Incident } from './supabase';
 import { todayIsoDate } from './date';
 
 // Uploads an incident photo to the shared shift-photos bucket and returns its public URL.
@@ -9,7 +9,7 @@ export async function uploadIncidentPhoto(deviceId: string, localUri: string): P
   const response = await fetch(localUri);
   const arrayBuffer = await response.arrayBuffer();
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabaseStorage.storage
     .from('shift-photos')
     .upload(fileName, arrayBuffer, {
       contentType: 'image/jpeg',

@@ -52,6 +52,7 @@ export default function KnowledgeArticleScreen() {
           </View>
         ) : (
           <ScrollView
+            style={styles.flex}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
@@ -113,6 +114,7 @@ export default function KnowledgeArticleScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

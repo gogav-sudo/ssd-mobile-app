@@ -42,6 +42,7 @@ export default function KnowledgeEntryScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         <ScrollView
+          style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -108,6 +109,7 @@ export default function KnowledgeEntryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, paddingHorizontal: spacing.xl },
+  flex: { flex: 1 },
   scrollContent: {
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,

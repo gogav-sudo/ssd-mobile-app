@@ -21,7 +21,7 @@ import { supabase } from '@/lib/supabase';
 // is safe (upsert: true on the storage object), but a retry after a
 // timed-out-but-actually-succeeded insert can leave a duplicate 'open' row
 // for the day — acceptable trade-off vs. leaving the screen stuck forever.
-const UPLOAD_TIMEOUT_MS = 10000;
+const UPLOAD_TIMEOUT_MS = 60000;
 
 export default function UploadingScreen() {
   const router = useRouter();

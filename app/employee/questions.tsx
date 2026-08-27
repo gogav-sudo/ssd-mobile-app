@@ -130,6 +130,7 @@ export default function EmployeeQuestionsScreen() {
           keyboardVerticalOffset={16}
         >
           <ScrollView
+            style={styles.flex}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"

@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   // inner layer centers a comfortably-sized content column on top of it so
   // buttons/inputs/cards never stretch to fill an ultra-wide browser window.
   webOuter: {
-    minHeight: '100vh' as unknown as number,
+    flex: 1,
     width: '100%',
     backgroundColor: colors.background,
     alignItems: 'center',

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { WizardLayout } from '@/components/ui/WizardLayout';
 import { Button } from '@/components/ui/Button';
 import { useStartShift } from '@/context/StartShiftContext';
-import { supabase } from '@/lib/supabase';
+import { supabaseStorage } from '@/lib/supabase';
 import { colors, radius, spacing, type } from '@/theme';
 
 // Same idea as app/employee/start-shift/uploading.tsx: this is a WRITE, so on
@@ -49,7 +49,7 @@ export default function NotesScreen() {
     try {
       if (!data.shiftId) throw new Error('Смена не найдена. Попробуйте начать заново.');
 
-      const { error } = await supabase
+      const { error } = await supabaseStorage
         .from('shifts')
         .update({
           start_uniform_ok: data.uniformOk,

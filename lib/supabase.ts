@@ -31,6 +31,17 @@ export const supabase = createClient(
   }
 );
 
+// Dedicated client for Storage traffic only (shift/incident photo uploads).
+// Large uploads through the ssd-api.ru Cloudflare Worker proxy stall
+// indefinitely on some mobile networks (confirmed via Chrome DevTools:
+// request stuck at "Stalled", 0 kB transferred), so Storage requests go
+// directly to Supabase instead. Every other request (auth, table
+// reads/writes) still goes through `supabase` above, unchanged.
+export const supabaseStorage = createClient(
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key'
+);
+
 console.log('[supabase.ts] createClient() returned — module fully evaluated.');
 
 // ---- Types matching the existing schema (read/write only, never altered) ----
