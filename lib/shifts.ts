@@ -311,7 +311,12 @@ export async function uploadStartShiftPhoto(
   deviceId: string,
   localUri: string
 ): Promise<PhotoUploadResult> {
-  const objectPath = `${deviceId}_${todayIsoDate()}.jpg`;
+  // A unique component per attempt (same Date.now() pattern already used for
+  // incident photos in lib/incidents.ts) — without this, every attempt on the
+  // same device/day collided on the same deterministic path, so a late-
+  // finishing upload from an earlier (e.g. timed-out) attempt could silently
+  // overwrite the photo already referenced by an already-created shift.
+  const objectPath = `${deviceId}_${todayIsoDate()}_${Date.now()}.jpg`;
   const bucket = 'shift-photos';
   const mimeType = 'image/jpeg';
 
@@ -357,7 +362,7 @@ export async function uploadStartShiftPhoto(
   try {
     const result = await supabaseDirect.storage.from(bucket).upload(objectPath, arrayBuffer, {
       contentType: mimeType,
-      upsert: true,
+      upsert: false,
     });
     uploadError = result.error as UploadErrorShape;
   } catch (err: any) {

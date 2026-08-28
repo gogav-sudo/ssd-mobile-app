@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,6 +10,16 @@ import { getDeviceIdentityId } from '@/lib/deviceIdentity';
 import { uploadStartShiftPhoto } from '@/lib/shifts';
 import { colors, radius, spacing, type } from '@/theme';
 
+// Same independent-timer pattern as app/employee-start-shift/uploading.tsx:
+// on some networks/devices the upload's fetch/arrayBuffer/storage-upload
+// chain can stall below the fetch layer and never resolve or reject at all,
+// which would otherwise leave photoUploadState stuck on 'uploading' forever
+// (confirmed via read-only audit: no AbortController/timeout previously
+// guarded this step). This does NOT cancel the underlying upload — it only
+// stops the SCREEN from waiting on it forever; a late result is discarded
+// via the token/timedOut guards in startUpload below.
+const UPLOAD_TIMEOUT_MS = 60000;
+
 export default function StartShiftPhotoScreen() {
   const router = useRouter();
   const { data, setPhotoUri, setPhotoUploadState, setPhotoUpload } = useStartShift();
@@ -20,19 +30,44 @@ export default function StartShiftPhotoScreen() {
   // or an earlier retry) applying its result after a newer one has started —
   // whichever upload's token no longer matches is ignored on completion.
   const uploadTokenRef = useRef(0);
+  const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    };
+  }, []);
 
   const startUpload = async (uri: string) => {
     const token = ++uploadTokenRef.current;
+    // Local to this attempt (not the shared token) — distinguishes "the
+    // force timer already gave up on THIS attempt" from "a newer attempt
+    // started", since a retry always bumps the token but a same-attempt
+    // late settle after timeout does not.
+    let timedOut = false;
     setUploadErrorMessage(null);
     setPhotoUploadState('uploading');
+
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
+    forceTimerRef.current = setTimeout(() => {
+      if (uploadTokenRef.current !== token) return; // superseded by a newer attempt
+      timedOut = true;
+      setPhotoUploadState('error');
+      setUploadErrorMessage(
+        'Не удалось загрузить фото. Проверьте подключение и попробуйте снова.'
+      );
+    }, UPLOAD_TIMEOUT_MS);
+
     try {
       const deviceId = await getDeviceIdentityId();
       if (!deviceId) throw new Error('Не удалось определить устройство.');
       const result = await uploadStartShiftPhoto(deviceId, uri);
-      if (uploadTokenRef.current !== token) return; // superseded — ignore this result
+      if (uploadTokenRef.current !== token || timedOut) return; // superseded or already timed out
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setPhotoUpload(result.objectPath, result.publicUrl);
     } catch (err: any) {
-      if (uploadTokenRef.current !== token) return;
+      if (uploadTokenRef.current !== token || timedOut) return;
+      if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setPhotoUploadState('error');
       setUploadErrorMessage(
         err?.message ?? 'Не удалось загрузить фото. Проверьте подключение и попробуйте снова.'
@@ -86,6 +121,7 @@ export default function StartShiftPhotoScreen() {
 
   const handleRetakePhoto = () => {
     uploadTokenRef.current += 1; // invalidate any in-flight upload for the old photo
+    if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
     setUploadErrorMessage(null);
     setPhotoUri(null);
   };
