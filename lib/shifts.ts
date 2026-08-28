@@ -389,7 +389,7 @@ export async function uploadStartShiftPhoto(
     throw uploadError;
   }
 
-  const { data } = supabase.storage.from(bucket).getPublicUrl(objectPath);
+  const { data } = supabaseDirect.storage.from(bucket).getPublicUrl(objectPath);
   return { objectPath, publicUrl: data.publicUrl };
 }
 

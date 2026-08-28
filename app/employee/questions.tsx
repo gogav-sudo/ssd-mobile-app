@@ -18,28 +18,29 @@ import { Button } from '@/components/ui/Button';
 import { colors, radius, spacing, type } from '@/theme';
 import { useEmployee } from '@/context/EmployeeContext';
 import { getDeviceIdentityId } from '@/lib/deviceIdentity';
-import { createResidentQuestion, getTodayResidentQuestions } from '@/lib/residentQuestions';
+import { createResidentQuestion, getTodayResidentQuestions, logQuestionSaveOutcome } from '@/lib/residentQuestions';
 import type { ResidentQuestion } from '@/lib/supabase';
 
-// Same idea as app/employee/start-shift/uploading.tsx: this is a WRITE, so on
-// timeout we surface an explicit error and let the person retry rather than
-// silently continuing — we don't know whether the insert actually landed.
-const SAVE_TIMEOUT_MS = 8000;
+// This is a WRITE through supabaseDirect, which has confirmed occasional
+// latency well beyond a "normal" read/write budget. 60s gives the real
+// request room to actually finish before the screen gives up waiting.
+// Critically, this timer does NOT decide success/failure by itself — it
+// only switches the UI to a neutral "still waiting" message. The real
+// outcome (success or a definite error) is decided solely by the insert's
+// own promise settling, whenever that happens.
+const SAVE_TIMEOUT_MS = 60000;
 
 export default function EmployeeQuestionsScreen() {
   const { employee } = useEmployee();
   const [value, setValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [waitingLonger, setWaitingLonger] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [questions, setQuestions] = useState<ResidentQuestion[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Tracks whether this attempt has already been resolved (by the request
-  // finishing, or by the force timer firing first) so whichever happens LAST
-  // is a no-op.
-  const settledRef = useRef(false);
   const forceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -72,22 +73,28 @@ export default function EmployeeQuestionsScreen() {
   );
 
   const handleSave = async () => {
+    if (saving) return; // ignore repeated taps while a save is already in flight
     const questionText = value.trim();
-    if (!questionText || saving) return;
+    if (!questionText) return;
 
     setSaving(true);
     setErrorMessage(null);
+    setWaitingLonger(false);
     setJustSaved(false);
-    settledRef.current = false;
+    const startedAt = Date.now();
 
     if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
     forceTimerRef.current = setTimeout(() => {
-      if (settledRef.current) return;
-      settledRef.current = true;
-      setSaving(false);
-      setErrorMessage(
-        'Сохранение занимает больше времени, чем ожидалось. Проверьте подключение и попробуйте снова.'
-      );
+      // This does NOT decide success/failure and does NOT re-enable the
+      // button — the insert may still be in flight and could still land.
+      // It only switches the UI to a neutral "still waiting" message so a
+      // second INSERT is never started while this one's outcome is unknown.
+      setWaitingLonger(true);
+      logQuestionSaveOutcome({
+        operation: 'question-save',
+        elapsedMs: Date.now() - startedAt,
+        outcome: 'timeout',
+      });
     }, SAVE_TIMEOUT_MS);
 
     try {
@@ -103,20 +110,22 @@ export default function EmployeeQuestionsScreen() {
         questionText,
       });
 
-      if (settledRef.current) return; // force timer already showed the error
-      settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
 
-      setQuestions((current) => [created, ...current]);
+      // Guard against adding the same row twice, in case a concurrent
+      // loadToday() (e.g. from a focus event) already picked it up.
+      setQuestions((current) =>
+        current.some((q) => q.id === created.id) ? current : [created, ...current]
+      );
       setValue('');
       setJustSaved(true);
       setSaving(false);
+      setWaitingLonger(false);
       setTimeout(() => setJustSaved(false), 2200);
     } catch (err: any) {
-      if (settledRef.current) return; // force timer already fired
-      settledRef.current = true;
       if (forceTimerRef.current) clearTimeout(forceTimerRef.current);
       setSaving(false);
+      setWaitingLonger(false);
       setErrorMessage(err?.message ?? 'Не удалось сохранить вопрос. Попробуйте снова.');
     }
   };
@@ -159,12 +168,17 @@ export default function EmployeeQuestionsScreen() {
 
             {errorMessage ? (
               <Text style={[type.caption, styles.errorText]}>{errorMessage}</Text>
+            ) : waitingLonger ? (
+              <Text style={[type.caption, styles.waitingText]}>
+                Сохранение занимает больше времени, чем обычно. Пожалуйста, подождите — мы
+                дождёмся ответа сервера, повторно отправлять не нужно.
+              </Text>
             ) : null}
 
             <Button
               label="Записать"
               onPress={handleSave}
-              disabled={!value.trim()}
+              disabled={!value.trim() || saving}
               loading={saving}
             />
 
@@ -258,6 +272,11 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.error,
     marginBottom: spacing.sm,
+  },
+  waitingText: {
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+    lineHeight: 18,
   },
   confirmRow: {
     flexDirection: 'row',

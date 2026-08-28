@@ -1,6 +1,7 @@
-import { supabase, Shift } from './supabase';
+import { supabase, supabaseDirect, Shift } from './supabase';
 import { todayIsoDate } from './date';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
+import type { ShiftByIdResult } from './shifts';
 
 // ---- Dashboard (Обзор) ----
 
@@ -90,9 +91,16 @@ export type ShiftsFilter = {
   status: ShiftStatusFilter;
 };
 
-// Falls back to an empty list if the network stalls.
+// Reads shifts directly (bypasses the ssd-api.ru proxy) for the supervisor
+// journal — same rationale as the employee critical flow in lib/shifts.ts:
+// the proxy has confirmed latency well beyond a normal read budget, and
+// silently falling back to an empty list on timeout previously made a real
+// "couldn't load" condition indistinguishable from "no shifts match these
+// filters". A timeout or network/Supabase error is now surfaced as a thrown
+// error instead, so the screen's existing error state can show it correctly
+// rather than a false empty-list.
 export async function getShifts(filter: ShiftsFilter): Promise<Shift[]> {
-  let query = supabase.from('shifts').select('*');
+  let query = supabaseDirect.from('shifts').select('*');
 
   if (filter.date) {
     query = query.eq('shift_date', filter.date);
@@ -104,41 +112,50 @@ export async function getShifts(filter: ShiftsFilter): Promise<Shift[]> {
     query = query.eq('status', filter.status);
   }
 
-  const result = await raceWithTimeout(
-    query.order('shift_date', { ascending: false }).order('start_time', { ascending: false }),
-    DEFAULT_QUERY_TIMEOUT_MS,
-    'getShifts'
-  );
+  let response: { data: Shift[] | null; error: { message: string } | null };
+  try {
+    response = await query
+      .order('shift_date', { ascending: false })
+      .order('start_time', { ascending: false });
+  } catch (err: any) {
+    throw new Error(
+      err?.message ?? 'Не удалось загрузить смены. Проверьте подключение и попробуйте снова.'
+    );
+  }
 
-  if (result.timedOut) return [];
-  if (result.error) throw result.error;
-  return result.data ?? [];
+  if (response.error) throw new Error(response.error.message);
+  return response.data ?? [];
 }
 
-// Falls back to `null` if the network stalls.
-export async function getShiftById(id: number): Promise<Shift | null> {
-  const result = await raceWithTimeout(
-    supabase.from('shifts').select('*').eq('id', id).maybeSingle(),
-    DEFAULT_QUERY_TIMEOUT_MS,
-    'getShiftById'
-  );
+// Direct-client read for a single shift by id, used by the supervisor
+// shift-detail screen. Returns a discriminated result instead of `Shift |
+// null`: `not_found` is only ever returned when the server has confirmed no
+// row exists for this id — a timeout or network/Supabase error resolves to
+// `unknown` instead, and must never be shown to the user as "shift not
+// found".
+export async function getShiftById(id: number): Promise<ShiftByIdResult> {
+  let response: { data: Shift | null; error: { message: string } | null };
+  try {
+    response = await supabaseDirect.from('shifts').select('*').eq('id', id).maybeSingle();
+  } catch {
+    return { status: 'unknown' };
+  }
 
-  if (result.timedOut) return null;
-  if (result.error) throw result.error;
-  return result.data;
+  if (response.error) return { status: 'unknown' };
+  return response.data ? { status: 'found', shift: response.data } : { status: 'not_found' };
 }
 
 // Distinct object names across all shifts, for the object filter options.
-// Falls back to an empty list if the network stalls.
+// Same direct-client + throw-on-failure rationale as getShifts above.
 export async function getDistinctObjectNames(): Promise<string[]> {
-  const result = await raceWithTimeout(
-    supabase.from('shifts').select('object_name'),
-    DEFAULT_QUERY_TIMEOUT_MS,
-    'getDistinctObjectNames'
-  );
+  let response: { data: { object_name: string }[] | null; error: { message: string } | null };
+  try {
+    response = await supabaseDirect.from('shifts').select('object_name');
+  } catch (err: any) {
+    throw new Error(err?.message ?? 'Не удалось загрузить список объектов.');
+  }
 
-  if (result.timedOut) return [];
-  if (result.error) throw result.error;
-  const set = new Set((result.data ?? []).map((row) => row.object_name).filter(Boolean));
+  if (response.error) throw new Error(response.error.message);
+  const set = new Set((response.data ?? []).map((row) => row.object_name).filter(Boolean));
   return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
 }

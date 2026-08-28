@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,25 +9,43 @@ import { colors, radius, spacing, type } from '@/theme';
 import { getShiftById } from '@/lib/supervisorData';
 import type { Shift } from '@/lib/supabase';
 
+// 'unknown' means the read itself failed (network/timeout) — it must never
+// be presented as "shift not found", since the shift could well still exist
+// server-side (see lib/supervisorData.ts getShiftById / ShiftByIdResult).
+type LoadState = 'loading' | 'found' | 'not_found' | 'unknown' | 'invalid_id';
+
 export default function SupervisorShiftDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [shift, setShift] = useState<Shift | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [state, setState] = useState<LoadState>('loading');
+  // Tracks a failed Image load for the *currently shown* start_photo_url —
+  // reset below whenever the shift or its start_photo_url changes, so a
+  // stale failure never carries over onto a different shift's photo.
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setPhotoLoadFailed(false);
+  }, [shift?.id, shift?.start_photo_url]);
 
   const load = useCallback(async () => {
     const numericId = Number(id);
-    if (!numericId) return;
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const row = await getShiftById(numericId);
-      setShift(row);
-    } catch (err: any) {
-      setErrorMessage(err?.message ?? 'Не удалось загрузить смену.');
-    } finally {
-      setLoading(false);
+    if (!id || !Number.isFinite(numericId) || numericId <= 0) {
+      setShift(null);
+      setState('invalid_id');
+      return;
+    }
+    setState('loading');
+    const result = await getShiftById(numericId);
+    if (result.status === 'found') {
+      setShift(result.shift);
+      setState('found');
+    } else if (result.status === 'not_found') {
+      setShift(null);
+      setState('not_found');
+    } else {
+      setShift(null);
+      setState('unknown');
     }
   }, [id]);
 
@@ -40,17 +58,27 @@ export default function SupervisorShiftDetailScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        {loading ? (
+        {state === 'loading' ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color={colors.gold} />
           </View>
-        ) : errorMessage || !shift ? (
+        ) : state === 'invalid_id' ? (
+          <View style={styles.centerState}>
+            <Text style={[type.bodySmall, styles.errorText]}>Некорректная ссылка на смену.</Text>
+          </View>
+        ) : state === 'not_found' ? (
+          <View style={styles.centerState}>
+            <Text style={[type.bodySmall, styles.errorText]}>Смена не найдена.</Text>
+          </View>
+        ) : state === 'unknown' ? (
           <View style={styles.centerState}>
             <Text style={[type.bodySmall, styles.errorText]}>
-              {errorMessage ?? 'Смена не найдена.'}
+              Не удалось загрузить смену. Проверьте подключение и повторите.
             </Text>
+            <View style={{ height: spacing.md }} />
+            <Button label="Повторить" onPress={load} />
           </View>
-        ) : (
+        ) : shift ? (
           <ScrollView
             style={styles.flex}
             contentContainerStyle={styles.scrollContent}
@@ -97,12 +125,18 @@ export default function SupervisorShiftDetailScreen() {
 
             <Text style={[type.caption, styles.sectionLabel]}>НАЧАЛО СМЕНЫ</Text>
 
-            {shift.start_photo_url ? (
-              <Image source={{ uri: shift.start_photo_url }} style={styles.photo} />
+            {shift.start_photo_url && !photoLoadFailed ? (
+              <Image
+                source={{ uri: shift.start_photo_url }}
+                style={styles.photo}
+                onError={() => setPhotoLoadFailed(true)}
+              />
             ) : (
               <View style={styles.photoPlaceholder}>
                 <ImageOff size={22} color={colors.textTertiary} strokeWidth={1.6} />
-                <Text style={[type.caption, styles.photoPlaceholderText]}>Фото не загружено</Text>
+                <Text style={[type.caption, styles.photoPlaceholderText]}>
+                  {shift.start_photo_url ? 'Фото недоступно' : 'Фото не загружено'}
+                </Text>
               </View>
             )}
 
@@ -145,7 +179,7 @@ export default function SupervisorShiftDetailScreen() {
 
             <View style={styles.footerSpacer} />
           </ScrollView>
-        )}
+        ) : null}
 
         <View style={styles.footer}>
           <Button label="Назад к списку" variant="secondary" onPress={() => router.back()} />
