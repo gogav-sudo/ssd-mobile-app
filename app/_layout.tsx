@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { EmployeeProvider } from '@/context/EmployeeContext';
 import { ReportProblemProvider } from '@/context/ReportProblemContext';
+import { SupervisorAccessProvider } from '@/context/SupervisorAccessContext';
 import { colors } from '@/theme';
 
 console.log('[RootLayout] Module evaluated — all imports resolved, before first render.');
@@ -25,29 +26,31 @@ export default function RootLayout() {
   console.log('[RootLayout] useFrameworkReady() returned — about to render tree.');
 
   return (
-    <EmployeeProvider>
-      {/*
-        Lives here, not in app/employee/report/_layout.tsx, because the
-        report flow spans two separate route trees: report/index.tsx (a Tab,
-        stays inside app/employee/) sets incidentType before pushing into
-        employee-report-wizard/* (a sibling top-level Stack, outside Tabs, so
-        it isn't clipped by bottom-tabs' overflow:hidden on web). A provider
-        local to either tree would give the other an independent instance
-        with its own blank state, dropping incidentType/description/etc.
-        silently between the two.
-      */}
-      <ReportProblemProvider>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="+not-found" />
-          <Stack.Screen name="supervisor-pin" />
-        </Stack>
-      </ReportProblemProvider>
-      <StatusBar style="light" />
-    </EmployeeProvider>
+    <SupervisorAccessProvider>
+      <EmployeeProvider>
+        {/*
+          Lives here, not in app/employee/report/_layout.tsx, because the
+          report flow spans two separate route trees: report/index.tsx (a Tab,
+          stays inside app/employee/) sets incidentType before pushing into
+          employee-report-wizard/* (a sibling top-level Stack, outside Tabs, so
+          it isn't clipped by bottom-tabs' overflow:hidden on web). A provider
+          local to either tree would give the other an independent instance
+          with its own blank state, dropping incidentType/description/etc.
+          silently between the two.
+        */}
+        <ReportProblemProvider>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <Stack.Screen name="+not-found" />
+            <Stack.Screen name="supervisor-pin" />
+          </Stack>
+        </ReportProblemProvider>
+        <StatusBar style="light" />
+      </EmployeeProvider>
+    </SupervisorAccessProvider>
   );
 }

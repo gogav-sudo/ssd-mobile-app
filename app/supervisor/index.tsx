@@ -14,15 +14,18 @@ import {
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
 import { colors, radius, spacing, type } from '@/theme';
 import { getDashboardStats, DashboardStats } from '@/lib/supervisorData';
+import { useSupervisorAccess } from '@/context/SupervisorAccessContext';
 
 export default function SupervisorOverviewScreen() {
   const router = useRouter();
+  const { revokeSupervisorAccess } = useSupervisorAccess();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleExit = () => {
+    revokeSupervisorAccess();
     router.replace('/');
   };
 

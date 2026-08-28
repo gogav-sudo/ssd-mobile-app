@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Lock } from 'lucide-react-native';
 import { ScreenBackground } from '@/components/ui/ScreenBackground';
+import { useSupervisorAccess } from '@/context/SupervisorAccessContext';
 import { colors, radius, spacing, type } from '@/theme';
 
 const PIN_LENGTH = 6;
@@ -15,6 +16,7 @@ const DIGIT_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del']
 
 export default function SupervisorPinScreen() {
   const router = useRouter();
+  const { grantSupervisorAccess } = useSupervisorAccess();
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
   const [attempts, setAttempts] = useState(0);
@@ -56,6 +58,7 @@ export default function SupervisorPinScreen() {
 
         if (next.length === PIN_LENGTH) {
           if (next === CORRECT_PIN) {
+            grantSupervisorAccess();
             setTimeout(() => router.replace('/supervisor'), 150);
           } else {
             const nextAttempts = attempts + 1;
@@ -73,7 +76,7 @@ export default function SupervisorPinScreen() {
         return next;
       });
     },
-    [attempts, isLocked, router]
+    [attempts, isLocked, router, grantSupervisorAccess]
   );
 
   const handleDelete = useCallback(() => {

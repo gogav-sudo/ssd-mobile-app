@@ -53,7 +53,7 @@ export default function EmployeeProfileScreen() {
   );
 
   const handleSupervisorEntry = () => {
-    router.replace('/supervisor');
+    router.replace('/supervisor-pin');
   };
 
   return (

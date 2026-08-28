@@ -1,9 +1,23 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { LayoutGrid, ShieldAlert, CalendarClock, Users, BookOpen } from 'lucide-react-native';
 import { StyleSheet } from 'react-native';
 import { colors, fontFamily } from '@/theme';
+import { useSupervisorAccess } from '@/context/SupervisorAccessContext';
 
 export default function SupervisorTabsLayout() {
+  const { supervisorAccessGranted } = useSupervisorAccess();
+
+  // Single guard for the entire /supervisor/** tree (dashboard, shifts,
+  // shift details, incidents, incident details, employees, employee
+  // details, questions, feedback, knowledge, and any other route nested
+  // under this layout) — every one of them renders as a child of this
+  // Tabs layout, so gating here covers all of them without touching each
+  // screen individually. /supervisor-pin lives outside app/supervisor/, so
+  // it never passes through this guard — no redirect loop is possible.
+  if (!supervisorAccessGranted) {
+    return <Redirect href="/supervisor-pin" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
