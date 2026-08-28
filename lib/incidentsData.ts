@@ -1,4 +1,4 @@
-import { supabase, Incident } from './supabase';
+import { supabase, supabaseDirect, Incident } from './supabase';
 import { raceWithTimeout, DEFAULT_QUERY_TIMEOUT_MS } from './withFallbackTimeout';
 
 export type IncidentStatus = 'new' | 'in_progress' | 'resolved';
@@ -47,17 +47,29 @@ export async function getIncidents(filter: IncidentsFilter): Promise<Incident[]>
   return result.data ?? [];
 }
 
-// Falls back to `null` if the network stalls.
-export async function getIncidentById(id: number): Promise<Incident | null> {
-  const result = await raceWithTimeout(
-    supabase.from('incidents').select('*').eq('id', id).maybeSingle(),
-    DEFAULT_QUERY_TIMEOUT_MS,
-    'getIncidentById'
-  );
+// Direct-client read for a single incident by id, used by the supervisor
+// incident-detail screen — same rationale and same discriminated-result
+// shape as lib/supervisorData.ts's getShiftById: `not_found` is only ever
+// returned when the server has confirmed no row exists for this id — a
+// timeout or network/Supabase error resolves to `unknown` instead, and must
+// never be shown to the user as "incident not found" (confirmed via
+// read-only audit: the proxied `supabase` client was silently returning
+// null on timeout here, making a real incident appear not to exist).
+export type IncidentByIdResult =
+  | { status: 'found'; incident: Incident }
+  | { status: 'not_found' }
+  | { status: 'unknown' };
 
-  if (result.timedOut) return null;
-  if (result.error) throw result.error;
-  return result.data;
+export async function getIncidentById(id: number): Promise<IncidentByIdResult> {
+  let response: { data: Incident | null; error: { message: string } | null };
+  try {
+    response = await supabaseDirect.from('incidents').select('*').eq('id', id).maybeSingle();
+  } catch {
+    return { status: 'unknown' };
+  }
+
+  if (response.error) return { status: 'unknown' };
+  return response.data ? { status: 'found', incident: response.data } : { status: 'not_found' };
 }
 
 export async function updateIncidentStatus(id: number, status: IncidentStatus): Promise<void> {

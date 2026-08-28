@@ -18,7 +18,7 @@ export async function uploadIncidentPhoto(deviceId: string, localUri: string): P
 
   if (uploadError) throw uploadError;
 
-  const { data } = supabase.storage.from('shift-photos').getPublicUrl(fileName);
+  const { data } = supabaseDirect.storage.from('shift-photos').getPublicUrl(fileName);
   return data.publicUrl;
 }
 

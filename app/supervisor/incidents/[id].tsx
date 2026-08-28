@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,6 +17,12 @@ import type { Incident } from '@/lib/supabase';
 
 const STATUS_ORDER: IncidentStatus[] = ['new', 'in_progress', 'resolved'];
 
+// 'unknown' means the read itself failed (network/timeout) — it must never
+// be presented as "incident not found", since the row could well still
+// exist server-side (see lib/incidentsData.ts getIncidentById /
+// IncidentByIdResult).
+type LoadState = 'loading' | 'found' | 'not_found' | 'unknown' | 'invalid_id';
+
 function urgencyColor(urgency: string): { fg: string; bg: string; border: string } {
   if (urgency === 'Высокая') return { fg: colors.error, bg: colors.errorMuted, border: colors.error };
   if (urgency === 'Средняя') return { fg: colors.warning, bg: colors.warningMuted, border: colors.warning };
@@ -27,22 +33,39 @@ export default function SupervisorIncidentDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<LoadState>('loading');
   const [updating, setUpdating] = useState(false);
+  // Status-update errors only (handleStatusChange below) — kept separate
+  // from the load-state machine above so a failed status update is never
+  // confused with "incident not found" / "failed to load".
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Tracks a failed Image load for the *currently shown* photo_url — reset
+  // below whenever the incident or its photo_url changes, so a stale
+  // failure never carries over onto a different incident's photo.
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setPhotoLoadFailed(false);
+  }, [incident?.id, incident?.photo_url]);
 
   const load = useCallback(async () => {
     const numericId = Number(id);
-    if (!numericId) return;
-    setLoading(true);
-    setErrorMessage(null);
-    try {
-      const row = await getIncidentById(numericId);
-      setIncident(row);
-    } catch (err: any) {
-      setErrorMessage(err?.message ?? 'Не удалось загрузить инцидент.');
-    } finally {
-      setLoading(false);
+    if (!id || !Number.isFinite(numericId) || numericId <= 0) {
+      setIncident(null);
+      setState('invalid_id');
+      return;
+    }
+    setState('loading');
+    const result = await getIncidentById(numericId);
+    if (result.status === 'found') {
+      setIncident(result.incident);
+      setState('found');
+    } else if (result.status === 'not_found') {
+      setIncident(null);
+      setState('not_found');
+    } else {
+      setIncident(null);
+      setState('unknown');
     }
   }, [id]);
 
@@ -68,19 +91,27 @@ export default function SupervisorIncidentDetailScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        {loading ? (
+        {state === 'loading' ? (
           <View style={styles.centerState}>
             <ActivityIndicator size="large" color={colors.gold} />
           </View>
-        ) : errorMessage && !incident ? (
+        ) : state === 'invalid_id' ? (
           <View style={styles.centerState}>
-            <Text style={[type.bodySmall, styles.errorText]}>{errorMessage}</Text>
+            <Text style={[type.bodySmall, styles.errorText]}>Некорректная ссылка на инцидент.</Text>
           </View>
-        ) : !incident ? (
+        ) : state === 'not_found' ? (
           <View style={styles.centerState}>
             <Text style={[type.bodySmall, styles.errorText]}>Инцидент не найден.</Text>
           </View>
-        ) : (
+        ) : state === 'unknown' ? (
+          <View style={styles.centerState}>
+            <Text style={[type.bodySmall, styles.errorText]}>
+              Не удалось загрузить инцидент. Проверьте подключение и повторите.
+            </Text>
+            <View style={{ height: spacing.md }} />
+            <Button label="Повторить" onPress={load} />
+          </View>
+        ) : incident ? (
           <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.headerRow}>
               <Text style={[type.label, styles.headerLabel]}>ИНЦИДЕНТ №{incident.id}</Text>
@@ -121,12 +152,18 @@ export default function SupervisorIncidentDetailScreen() {
             </View>
 
             <Text style={[type.caption, styles.sectionLabel]}>ФОТО</Text>
-            {incident.photo_url ? (
-              <Image source={{ uri: incident.photo_url }} style={styles.photo} />
+            {incident.photo_url && !photoLoadFailed ? (
+              <Image
+                source={{ uri: incident.photo_url }}
+                style={styles.photo}
+                onError={() => setPhotoLoadFailed(true)}
+              />
             ) : (
               <View style={styles.photoPlaceholder}>
                 <ImageOff size={22} color={colors.textTertiary} strokeWidth={1.6} />
-                <Text style={[type.caption, styles.photoPlaceholderText]}>Фото не приложено</Text>
+                <Text style={[type.caption, styles.photoPlaceholderText]}>
+                  {incident.photo_url ? 'Фото недоступно' : 'Фото не приложено'}
+                </Text>
               </View>
             )}
 
@@ -163,7 +200,7 @@ export default function SupervisorIncidentDetailScreen() {
 
             <View style={styles.footerSpacer} />
           </ScrollView>
-        )}
+        ) : null}
 
         <View style={styles.footer}>
           <Button label="Назад к списку" variant="secondary" onPress={() => router.back()} />
